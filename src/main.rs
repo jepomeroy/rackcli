@@ -1,6 +1,7 @@
 mod config;
 mod rackcliargs;
 mod switch;
+mod utils;
 mod wol;
 
 use clap::Parser;
@@ -64,6 +65,11 @@ fn update_wol_device() {
     config.write_config();
 }
 
+fn enable_wol_device() {
+    let config = read_config();
+    config.enable_wol();
+}
+
 fn main() {
     let args = RackCliArgs::parse();
 
@@ -80,6 +86,7 @@ fn main() {
             rackcliargs::WolSubCommand::Delete => delete_wol_device(),
             rackcliargs::WolSubCommand::List => list_wols(),
             rackcliargs::WolSubCommand::Update => update_wol_device(),
+            rackcliargs::WolSubCommand::Enable => enable_wol_device(),
         },
     }
 }

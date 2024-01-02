@@ -1,5 +1,7 @@
 use crate::switch::Switch;
+use crate::utils;
 use crate::wol::Wol;
+
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -111,6 +113,25 @@ impl Config {
             }
             Err(_) => return,
         }
+    }
+
+    pub fn enable_wol(&self) {
+        if self.wols.is_empty() {
+            println!("No Wake-on-Lan devices configured");
+            return;
+        }
+
+        let wol_names: Vec<String> = self.wols.iter().map(|wol| wol.name.clone()).collect();
+
+        let wol_name = dialoguer::Select::new()
+            .with_prompt("Wol device to enable")
+            .default(0)
+            .items(&wol_names[..])
+            .interact()
+            .unwrap();
+
+        let wol = &self.wols[wol_name];
+        let _ = utils::wake_on_lan(wol);
     }
 
     pub fn get_switch_names(&self) -> Vec<String> {

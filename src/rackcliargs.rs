@@ -9,9 +9,9 @@ pub struct RackCliArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum DeviceType {
-    /// Add, Delete, List, or Update Switch devices
+    /// Add, Delete, Disable, Enable, List, or Update Switch devices
     Switch(SwitchCmd),
-    /// Add, Delete, List, or Update Wake-On-Lan devices
+    /// Add, Delete, Enable, List, or Update Wake-On-Lan devices
     Wol(WolCmd),
     /// List all devices
     List,
@@ -51,4 +51,6 @@ pub enum WolSubCommand {
     List,
     /// Update a Wake-On-Lan device
     Update,
+    /// Enable Wake-On-Lan device
+    Enable,
 }

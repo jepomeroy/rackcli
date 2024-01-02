@@ -56,6 +56,15 @@ impl Wol {
 
         self.mac = mac;
     }
+
+    pub fn get_octets(&self) -> Vec<u8> {
+        let mut octets = Vec::<u8>::new();
+        for octet in self.mac.split(":") {
+            octets.push(u8::from_str_radix(octet, 16).unwrap());
+        }
+
+        octets
+    }
 }
 
 impl std::fmt::Display for Wol {
