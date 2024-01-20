@@ -1,7 +1,6 @@
 mod config;
 mod rackcliargs;
 mod switch;
-mod utils;
 mod wol;
 
 use clap::Parser;

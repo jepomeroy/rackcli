@@ -1,5 +1,4 @@
 use crate::switch::Switch;
-use crate::utils;
 use crate::wol::Wol;
 
 use directories::ProjectDirs;
@@ -131,7 +130,7 @@ impl Config {
             .unwrap();
 
         let wol = &self.wols[wol_name];
-        let _ = utils::wake_on_lan(wol);
+        let _ = wol.wake_on_lan();
     }
 
     pub fn get_switch_names(&self) -> Vec<String> {
