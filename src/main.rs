@@ -1,39 +1,27 @@
 mod config;
+mod device;
 mod rackcliargs;
+mod snmp;
 mod switch;
 mod wol;
 
 use clap::Parser;
 use config::read_config;
 use rackcliargs::RackCliArgs;
-
-// List commands
-fn list_config() {
-    let config = read_config();
-    config.print_config();
-}
-
-fn list_switches() {
-    let config = read_config();
-    config.print_switches();
-}
-
-fn list_wols() {
-    let config = read_config();
-    config.print_wols();
-}
+use switch::Switch;
+use wol::Wol;
 
 // Add commands
 fn add_switch() {
     let mut config = read_config();
-    let switch = switch::Switch::create(config.get_switch_names());
+    let switch = Switch::create(config.get_switch_names());
     config.add_switch(switch);
     config.write_config();
 }
 
 fn add_wol_device() {
     let mut config = read_config();
-    let wol = wol::Wol::create(config.get_wol_names());
+    let wol = Wol::create(config.get_wol_names());
     config.add_wol(wol);
     config.write_config();
 }
@@ -51,6 +39,22 @@ fn delete_wol_device() {
     config.write_config();
 }
 
+// List commands
+fn list_config() {
+    let config = read_config();
+    config.print_config();
+}
+
+fn list_switches() {
+    let config = read_config();
+    config.print_switches();
+}
+
+fn list_wols() {
+    let config = read_config();
+    config.print_wols();
+}
+
 // Update commands
 fn update_switch() {
     let mut config = read_config();
@@ -64,9 +68,27 @@ fn update_wol_device() {
     config.write_config();
 }
 
+// Enable commands
+fn enable_switch() {
+    let config = read_config();
+    config.enable_switch();
+}
+
 fn enable_wol_device() {
     let config = read_config();
     config.enable_wol();
+}
+
+// Disable commands
+fn disble_switch() {
+    let config = read_config();
+    config.disable_switch();
+}
+
+// Status commands
+fn status_switch() {
+    let config = read_config();
+    config.get_switch_status();
 }
 
 fn main() {
@@ -79,6 +101,9 @@ fn main() {
             rackcliargs::SwitchSubCommand::Delete => delete_switch(),
             rackcliargs::SwitchSubCommand::List => list_switches(),
             rackcliargs::SwitchSubCommand::Update => update_switch(),
+            rackcliargs::SwitchSubCommand::Enable => enable_switch(),
+            rackcliargs::SwitchSubCommand::Disable => disble_switch(),
+            rackcliargs::SwitchSubCommand::Status => status_switch(),
         },
         rackcliargs::DeviceType::Wol(wol) => match wol.command {
             rackcliargs::WolSubCommand::Add => add_wol_device(),
