@@ -1,79 +1,132 @@
-// use clent::CLient;
-use crate::switch::{SNMPAuth, SNMPEncryption, SNMPVersion, Switch};
+use std::net::SocketAddr;
 
-use snmpclient::client::{AuthProtocol, PrivacyProtocol, SNMPv3Client};
-use snmpclient::params::Params;
+use crate::snmpv2::SnmpV2Client;
+use crate::switch::{SNMPVersion, Switch, SwitchResult};
+use csnmp::ObjectIdentifier;
+use futures::executor::block_on;
+use tokio::spawn;
 
-const SNMP_PORT_NUM: u32 = 161;
-
-fn get_host(host: String) -> String {
-    if host.find(':').is_none() {
-        format!("{}:{}", host, SNMP_PORT_NUM)
-    } else {
-        host
-    }
+pub trait SnmpClient {
+    async fn get(
+        self,
+        socket_addr: SocketAddr,
+        community: Vec<u8>,
+        oid: ObjectIdentifier,
+        port: u32,
+    ) -> Result<SwitchResult, String>;
+    async fn set(
+        self,
+        socket_addr: SocketAddr,
+        community: Vec<u8>,
+        oid: ObjectIdentifier,
+        value: i32,
+        port: u32,
+    ) -> Result<SwitchResult, String>;
 }
 
-pub fn snmp_get(switch: &Switch) -> Result<String, String> {
-    match switch.get_version() {
-        SNMPVersion::V2 => {
-            let params = Params::new_params_v2c(
-                switch.get_host(),
-                switch.get_username(),
-                switch.get_community(),
-            );
-        }
-        SNMPVersion::V3 => {
-            let auth_protocol = match switch.get_auth_protocol() {
-                SNMPAuth::MD5 => Some(AuthProtocol::MD5),
-                SNMPAuth::SHA => Some(AuthProtocol::SHA),
-                _ => None,
-            };
+pub struct Snmp {}
 
-            let privacy_protocol = match switch.get_privacy_protocol() {
-                SNMPEncryption::DES => Some(PrivacyProtocol::DES),
-                SNMPEncryption::AES => Some(PrivacyProtocol::AES),
-                _ => None,
-            };
+impl Snmp {
+    pub fn new() -> Self {
+        Self {}
+    }
 
-            let params = Params::new_params_v3(
-                switch.get_host(),
-                switch.get_username(),
-                auth_protocol,
-                switch.get_auth_password(),
-                privacy_protocol,
-                switch.get_privacy_password(),
-            );
-            let client = SNMPv3Client::new(params);
+    pub fn get(&self, switch: &Switch, ports: Vec<u32>) -> Result<Vec<SwitchResult>, String> {
+        match switch.get_version() {
+            SNMPVersion::V2 => {
+                let mut switch_results = Vec::new();
+                let mut futures = Vec::new();
+                for port in ports.iter() {
+                    let socket_addr = switch.get_socket_addr();
+                    let oid = Snmp::make_oid(&switch, *port);
+                    let v2 = SnmpV2Client {};
+
+                    futures.push(spawn(v2.get(
+                        socket_addr,
+                        switch.get_community().into(),
+                        oid,
+                        *port,
+                    )));
+                }
+
+                let mut results = Vec::new();
+                for future in futures {
+                    results.push(block_on(future));
+                }
+
+                // Print the results
+                for result_result in results {
+                    match result_result {
+                        Ok(result) => {
+                            if let Ok(switch_result) = result {
+                                switch_results.push(switch_result.clone());
+                            }
+                        }
+                        Err(e) => {
+                            println!("{}", e);
+                        }
+                    }
+                }
+
+                Ok(switch_results)
+            }
+            _ => todo!(),
         }
     }
 
-    Ok("bar".to_string())
-}
+    pub fn set(
+        &self,
+        switch: &Switch,
+        ports: Vec<u32>,
+        value: i32,
+    ) -> Result<Vec<SwitchResult>, String> {
+        match switch.get_version() {
+            SNMPVersion::V2 => {
+                let mut switch_results = Vec::new();
+                let mut futures = Vec::new();
+                for port in ports.iter() {
+                    let socket_addr = switch.get_socket_addr();
+                    let oid = Snmp::make_oid(&switch, *port);
+                    let v2 = SnmpV2Client {};
 
-// pub fn snmp_set() -> Result<String, Error> {
-//     request::snmp_get(PduType::SetRequest, oids, &mut client, &mut session)?;
+                    futures.push(spawn(v2.set(
+                        socket_addr,
+                        switch.get_community().into(),
+                        oid,
+                        value,
+                        *port,
+                    )));
+                }
 
-//     Ok("foo")
-// }
+                let mut results = Vec::new();
+                for future in futures {
+                    results.push(block_on(future));
+                }
 
-// Tests
-#[cfg(test)]
+                // Print the results
+                for result_result in results {
+                    match result_result {
+                        Ok(result) => {
+                            if let Ok(switch_result) = result {
+                                switch_results.push(switch_result.clone());
+                            }
+                        }
+                        Err(e) => {
+                            println!("{}", e);
+                        }
+                    }
+                }
 
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_host_with_port() {
-        let result = get_host("192.168.1.1:161".to_string());
-
-        assert_eq!(result, "192.168.1.1:161".to_string());
+                Ok(switch_results)
+            }
+            _ => todo!(),
+        }
     }
 
-    #[test]
-    fn test_host_with_out_port() {
-        let result = get_host("192.168.1.1".to_string());
+    fn make_oid(switch: &Switch, port: u32) -> ObjectIdentifier {
+        let mut octets_vec = switch.get_oid();
+        octets_vec.push(port);
 
-        assert_eq!(result, "192.168.1.1:161".to_string());
+        ObjectIdentifier::try_from(octets_vec.as_slice()).expect("Invalid OID")
     }
 }

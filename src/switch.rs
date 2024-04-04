@@ -1,21 +1,31 @@
 use crate::device::Device;
+use colored::Colorize;
 use dialoguer;
 use serde::{Deserialize, Serialize};
 
-use crate::snmp::snmp_get;
+use crate::snmp::Snmp;
+use crate::switch_oid::SwitchOidBuilder;
+
+use std::net::{IpAddr, SocketAddr};
 
 #[derive(Serialize, Deserialize)]
 pub struct Switch {
     pub name: String,
     ip: String,
+    brand: String,
     version: SNMPVersion,
-    ports: u8,
+    ports: u32,
     community: String,
     auth: SNMPAuth,
     auth_user: String,
     auth_pass: String,
     encryption: SNMPEncryption,
     encryption_pass: String,
+}
+#[derive(Clone)]
+pub struct SwitchResult {
+    pub port: u32,
+    pub status: String,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Copy)]
@@ -40,24 +50,45 @@ pub enum SNMPEncryption {
 
 impl Device for Switch {
     fn disable(&self) -> std::io::Result<()> {
-        todo!();
+        let off = SwitchOidBuilder::new()
+            .get_off(self.brand.clone())
+            .expect("Invalid brand");
+
+        self.set(off)
     }
 
     fn enable(&self) -> std::io::Result<()> {
-        todo!();
+        let on = SwitchOidBuilder::new()
+            .get_on(self.brand.clone())
+            .expect("Invalid brand");
+
+        self.set(on)
     }
 
     fn status(&self) -> std::io::Result<()> {
         let ports = self.get_ports();
-        println!("Status for {}:", self.name);
-        println!("{:?}", ports);
 
-        snmp_get(self);
+        let client = Snmp::new();
+        let results = client.get(self, ports);
+
+        match results {
+            Ok(results) => {
+                println!("Status for {}:", self.name);
+                for result in results {
+                    println!("\t{}", result);
+                }
+            }
+            Err(e) => {
+                println!("Error getting status for {}: {}", self.name, e);
+            }
+        }
 
         Ok(())
     }
 
     fn update(&mut self) {
+        let sob = SwitchOidBuilder::new();
+
         let mut username = String::new();
         let mut password = String::new();
         let mut community = String::new();
@@ -71,11 +102,25 @@ impl Device for Switch {
             .interact()
             .unwrap();
 
-        let ports = dialoguer::Input::<u8>::new()
+        let ports = dialoguer::Input::<u32>::new()
             .with_prompt("Ports")
             .default(self.ports)
             .interact()
             .unwrap();
+
+        let brand = sob.get_oid_name(
+            dialoguer::Select::new()
+                .with_prompt("Brand")
+                .default(
+                    sob.get_oid_names()
+                        .iter()
+                        .position(|x| x == &self.brand)
+                        .unwrap(),
+                )
+                .items(sob.get_oid_names().as_slice())
+                .interact()
+                .unwrap(),
+        );
 
         let version = match dialoguer::Select::new()
             .with_prompt("SNMP Version")
@@ -153,6 +198,7 @@ impl Device for Switch {
 
         self.ip = ip;
         self.ports = ports;
+        self.brand = brand;
         self.community = community;
         self.auth = auth;
         self.auth_user = username;
@@ -164,6 +210,7 @@ impl Device for Switch {
 
 impl Switch {
     pub fn create(switch_names: Vec<String>) -> Self {
+        let sob = SwitchOidBuilder::new();
         let mut username = String::new();
         let mut password = String::new();
         let mut community = String::new();
@@ -188,10 +235,18 @@ impl Switch {
             .interact()
             .unwrap();
 
-        let ports = dialoguer::Input::<u8>::new()
+        let ports = dialoguer::Input::<u32>::new()
             .with_prompt("Ports")
             .interact()
             .unwrap();
+
+        let brand = sob.get_oid_name(
+            dialoguer::Select::new()
+                .with_prompt("Brand")
+                .items(sob.get_oid_names().as_slice())
+                .interact()
+                .unwrap(),
+        );
 
         let version = match dialoguer::Select::new()
             .with_prompt("SNMP Version")
@@ -269,6 +324,7 @@ impl Switch {
             name,
             ip,
             ports,
+            brand,
             version,
             community,
             auth,
@@ -291,15 +347,22 @@ impl Switch {
         &self.community
     }
 
-    pub(crate) fn get_host(&self) -> &str {
-        if self.ip.find(':').is_none() {
-            format!("{}:161", self.ip).as_str()
-        } else {
-            &self.ip
-        }
+    pub(crate) fn get_socket_addr(&self) -> SocketAddr {
+        let ip_addr: IpAddr = self.ip.parse().expect("Invalid IP address");
+        SocketAddr::new(ip_addr, 161)
     }
 
-    fn get_ports(&self) -> Vec<u8> {
+    pub(crate) fn get_oid(&self) -> Vec<u32> {
+        let sob = SwitchOidBuilder::new();
+        let oid = sob
+            .get_switch_oid(self.brand.clone())
+            .expect("Invalid brand");
+
+        // Split the oid by '.' and convert each part to a u32
+        oid.split('.').map(|x| x.parse::<u32>().unwrap()).collect()
+    }
+
+    pub(crate) fn get_ports(&self) -> Vec<u32> {
         let ports_input = dialoguer::Input::<String>::new()
             .with_prompt("List of ports (ex: 1-6,8,10-12)")
             .default(format!("1-{}", self.ports))
@@ -324,7 +387,7 @@ impl Switch {
         self.version
     }
 
-    fn parse_ports(ports_input: String) -> Result<Vec<u8>, String> {
+    pub(crate) fn parse_ports(ports_input: String) -> Result<Vec<u32>, String> {
         let mut ports = Vec::new();
 
         for port in ports_input.split(',') {
@@ -340,11 +403,11 @@ impl Switch {
                 }
 
                 let start = range[0]
-                    .parse::<u8>()
+                    .parse::<u32>()
                     .map_err(|_| format!("Invalid port range: {}", ports_input))?;
 
                 let end = range[1]
-                    .parse::<u8>()
+                    .parse::<u32>()
                     .map_err(|_| format!("Invalid port range: {}", ports_input))?;
 
                 for i in start..=end {
@@ -352,7 +415,7 @@ impl Switch {
                 }
             } else {
                 ports.push(
-                    port.parse::<u8>()
+                    port.parse::<u32>()
                         .map_err(|_| format!("Invalid port range: {}", ports_input))?,
                 );
             }
@@ -361,6 +424,45 @@ impl Switch {
         ports.sort();
         ports.dedup();
         Ok(ports)
+    }
+
+    fn set(&self, value: i32) -> std::io::Result<()> {
+        let ports = self.get_ports();
+
+        let client = Snmp::new();
+        let results = client.set(self, ports, value);
+
+        match results {
+            Ok(results) => {
+                println!("Status for {}:", self.name);
+                for result in results {
+                    println!("\t{}", result);
+                }
+            }
+            Err(e) => {
+                println!("Error getting status for {}: {}", self.name, e);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl std::fmt::Display for SwitchResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.port < 10 {
+            if self.status == "on" {
+                write!(f, "Port: {}  - {}", self.port, self.status.green())
+            } else {
+                write!(f, "Port: {}  - {}", self.port, self.status.red())
+            }
+        } else {
+            if self.status == "on" {
+                write!(f, "Port: {} - {}", self.port, self.status.green())
+            } else {
+                write!(f, "Port: {} - {}", self.port, self.status.red())
+            }
+        }
     }
 }
 
@@ -398,14 +500,14 @@ impl std::fmt::Display for Switch {
         if self.version == SNMPVersion::V2 {
             return write!(
                 f,
-                "  Name: {}\n  Addr: {}\n  Ports: {}\n  Version: {}\n  Community: {}\n",
-                self.name, self.ip, self.ports, self.version, self.community
+                "  Name: {}\n  Addr: {}\n  Brand: {}\n  Ports: {}\n  Version: {}\n  Community: {}\n",
+                self.name, self.ip, self.brand, self.ports, self.version, self.community
             );
         } else {
             return write!(
                 f,
-                "  Name: {}\n  Addr: {}\n  Ports: {}\n  Version: {}\n  Username: {}\n  Auth: {}\n  Encryption: {}\n",
-                self.name, self.ip, self.ports, self.version, self.auth_user, self.auth, self.encryption
+                "  Name: {}\n  Addr: {}\n  Brand: {}\n  Ports: {}\n  Version: {}\n  Username: {}\n  Auth: {}\n  Encryption: {}\n",
+                self.name, self.ip, self.brand, self.ports, self.version, self.auth_user, self.auth, self.encryption
             );
         }
     }

@@ -2,7 +2,9 @@ mod config;
 mod device;
 mod rackcliargs;
 mod snmp;
+mod snmpv2;
 mod switch;
+mod switch_oid;
 mod wol;
 
 use clap::Parser;
@@ -91,7 +93,8 @@ fn status_switch() {
     config.get_switch_status();
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args = RackCliArgs::parse();
 
     match args.device_type {

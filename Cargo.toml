@@ -7,9 +7,12 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.4.12", features = ["derive"] }
+colored = "2.1.0"
+csnmp = "0.6.0"
 dialoguer = "0.11.0"
 directories = "5.0.1"
+futures = "0.3.30"
 regex = "1.10.2"
 serde = { version = "1.0.193", features = ["derive"] }
-snmpclient = { path = "../snmpclient" }
+tokio = { version = "1.37.0", features = ["full"] }
 toml = "0.8.8"
