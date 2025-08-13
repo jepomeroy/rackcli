@@ -1,27 +1,15 @@
-use std::net::SocketAddr;
+use std::time::Duration;
 
+use crate::errors::SnmpError;
 use crate::snmpv2::SnmpV2Client;
 use crate::switch::{SNMPVersion, Switch, SwitchResult};
-use csnmp::ObjectIdentifier;
 use futures::executor::block_on;
+use snmp2::Oid;
 use tokio::spawn;
 
 pub trait SnmpClient {
-    async fn get(
-        self,
-        socket_addr: SocketAddr,
-        community: Vec<u8>,
-        oid: ObjectIdentifier,
-        port: u32,
-    ) -> Result<SwitchResult, String>;
-    async fn set(
-        self,
-        socket_addr: SocketAddr,
-        community: Vec<u8>,
-        oid: ObjectIdentifier,
-        value: i32,
-        port: u32,
-    ) -> Result<SwitchResult, String>;
+    async fn get(self, oid: Oid, port: u64) -> Result<SwitchResult, SnmpError>;
+    async fn set(self, oid: Oid, value: i64, port: u64) -> Result<SwitchResult, SnmpError>;
 }
 
 pub struct Snmp {}
@@ -31,22 +19,20 @@ impl Snmp {
         Self {}
     }
 
-    pub fn get(&self, switch: &Switch, ports: Vec<u32>) -> Result<Vec<SwitchResult>, String> {
+    pub fn get(&self, switch: &Switch, ports: Vec<u64>) -> Result<Vec<SwitchResult>, SnmpError> {
         match switch.get_version() {
             SNMPVersion::V2 => {
                 let mut switch_results = Vec::new();
                 let mut futures = Vec::new();
                 for port in ports.iter() {
-                    let socket_addr = switch.get_socket_addr();
-                    let oid = Snmp::make_oid(&switch, *port);
-                    let v2 = SnmpV2Client {};
+                    let oid = Snmp::make_oid(switch.get_oid(), *port);
+                    let v2 = SnmpV2Client::new(
+                        switch.get_socket_addr(),
+                        switch.get_community().as_bytes(),
+                        Some(Duration::from_secs(5)),
+                    )?;
 
-                    futures.push(spawn(v2.get(
-                        socket_addr,
-                        switch.get_community().into(),
-                        oid,
-                        *port,
-                    )));
+                    futures.push(spawn(v2.get(oid, *port)));
                 }
 
                 let mut results = Vec::new();
@@ -77,25 +63,22 @@ impl Snmp {
     pub fn set(
         &self,
         switch: &Switch,
-        ports: Vec<u32>,
-        value: i32,
-    ) -> Result<Vec<SwitchResult>, String> {
+        ports: Vec<u64>,
+        value: i64,
+    ) -> Result<Vec<SwitchResult>, SnmpError> {
         match switch.get_version() {
             SNMPVersion::V2 => {
                 let mut switch_results = Vec::new();
                 let mut futures = Vec::new();
                 for port in ports.iter() {
-                    let socket_addr = switch.get_socket_addr();
-                    let oid = Snmp::make_oid(&switch, *port);
-                    let v2 = SnmpV2Client {};
+                    let oid = Snmp::make_oid(switch.get_oid(), *port);
+                    let v2 = SnmpV2Client::new(
+                        switch.get_socket_addr(),
+                        switch.get_community().as_bytes(),
+                        Some(Duration::from_secs(5)),
+                    )?;
 
-                    futures.push(spawn(v2.set(
-                        socket_addr,
-                        switch.get_community().into(),
-                        oid,
-                        value,
-                        *port,
-                    )));
+                    futures.push(spawn(v2.set(oid, value, *port)));
                 }
 
                 let mut results = Vec::new();
@@ -123,10 +106,10 @@ impl Snmp {
         }
     }
 
-    fn make_oid(switch: &Switch, port: u32) -> ObjectIdentifier {
-        let mut octets_vec = switch.get_oid();
-        octets_vec.push(port);
+    fn make_oid(oid_vec: Vec<u64>, port: u64) -> Oid<'static> {
+        let mut new_vec = oid_vec.clone();
+        new_vec.push(port);
 
-        ObjectIdentifier::try_from(octets_vec.as_slice()).expect("Invalid OID")
+        Oid::from(new_vec.as_slice()).expect("Invalid OID")
     }
 }

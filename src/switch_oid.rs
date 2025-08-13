@@ -1,12 +1,12 @@
 struct SwitchOid {
     name: String,
     poe_oid: String,
-    on: i32,
-    off: i32,
+    on: i64,
+    off: i64,
 }
 
 impl SwitchOid {
-    fn new(name: String, poe_oid: String, on: i32, off: i32) -> SwitchOid {
+    fn new(name: String, poe_oid: String, on: i64, off: i64) -> SwitchOid {
         SwitchOid {
             name,
             poe_oid,
@@ -59,14 +59,14 @@ impl SwitchOidBuilder {
             .map(|switch_oid| &switch_oid.poe_oid)
     }
 
-    pub fn get_on(&self, name: String) -> Option<i32> {
+    pub fn get_on(&self, name: String) -> Option<i64> {
         self.switch_oids
             .iter()
             .find(|switch_oid| switch_oid.name == name)
             .map(|switch_oid| switch_oid.on)
     }
 
-    pub fn get_off(&self, name: String) -> Option<i32> {
+    pub fn get_off(&self, name: String) -> Option<i64> {
         self.switch_oids
             .iter()
             .find(|switch_oid| switch_oid.name == name)

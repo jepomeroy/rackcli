@@ -1,10 +1,12 @@
 mod config;
 mod device;
+mod errors;
 mod rackcliargs;
 mod snmp;
 mod snmpv2;
 mod switch;
 mod switch_oid;
+mod utils;
 mod wol;
 
 use clap::Parser;

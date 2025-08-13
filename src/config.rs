@@ -120,13 +120,13 @@ impl Config {
     }
 
     pub fn get_switch_names(&self) -> Vec<String> {
-        let mut switch_names: Vec<String> = self
+        let switch_names: Vec<String> = self
             .switches
             .iter()
             .map(|switch| switch.name.clone())
             .collect();
 
-        switch_names.sort();
+        // switch_names.sort();
 
         switch_names
     }

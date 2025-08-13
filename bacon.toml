@@ -1,0 +1,8 @@
+[jobs.build]
+command = ["cargo", "build", "--color", "always"]
+need_stdout = true
+background = false
+allow_warnings = true
+on_change_strategy = "kill_then_restart"
+kill = ["kill", "-s", "INT"]
+watch = ["src",  "Cargo.toml" ]

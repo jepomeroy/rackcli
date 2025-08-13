@@ -1,5 +1,4 @@
 use crate::device::Device;
-use dialoguer;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, UdpSocket};
@@ -93,7 +92,7 @@ impl Wol {
         Self { name, mac }
     }
 
-    fn get_octets(&self) -> Vec<u8> {
+    pub fn get_octets(&self) -> Vec<u8> {
         let mut octets = Vec::<u8>::new();
         for octet in self.mac.split(":") {
             octets.push(u8::from_str_radix(octet, 16).unwrap());

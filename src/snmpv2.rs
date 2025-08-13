@@ -1,90 +1,65 @@
 // use clent::CLient;
 
-use std::net::SocketAddr;
+use crate::utils::get_status;
+use crate::{errors::SnmpError, snmp::SnmpClient, switch::SwitchResult};
+use snmp2::{Oid, SyncSession, Value};
+use std::{net::SocketAddr, time::Duration};
 
-use csnmp::{ObjectIdentifier, ObjectValue, Snmp2cClient};
+pub struct SnmpV2Client {
+    session: SyncSession,
+}
 
-use crate::{snmp::SnmpClient, switch::SwitchResult};
-
-pub struct SnmpV2Client {}
+impl SnmpV2Client {
+    pub fn new(
+        socket_addr: SocketAddr,
+        community: &[u8],
+        timeout: Option<Duration>,
+    ) -> Result<Self, SnmpError> {
+        match SyncSession::new_v2c(socket_addr, community, timeout, 0) {
+            Ok(session) => Ok(Self { session }),
+            Err(e) => Err(SnmpError::SessionError(e.to_string())),
+        }
+    }
+}
 
 impl SnmpClient for SnmpV2Client {
-    async fn get(
-        self,
-        socket_addr: SocketAddr,
-        community: Vec<u8>,
-        oid: ObjectIdentifier,
-        port: u32,
-    ) -> Result<SwitchResult, String> {
-        let client_result = Snmp2cClient::new(socket_addr, community, None, None, 0).await;
+    async fn get(mut self, oid: Oid<'_>, port: u64) -> Result<SwitchResult, SnmpError> {
+        let response = self.session.get(&oid);
 
-        match client_result {
-            Ok(client) => {
-                let result = client.get(oid).await;
-                match result {
-                    Ok(val) => val
-                        .as_i32()
-                        .map(|v| {
-                            if v == 1 {
-                                Ok(SwitchResult {
-                                    port,
-                                    status: "on".to_string(),
-                                })
-                            } else if v == 2 {
-                                Ok(SwitchResult {
-                                    port,
-                                    status: "off".to_string(),
-                                })
-                            } else {
-                                Err(format!("Invalid value: {}", v))
-                            }
-                        })
-                        .unwrap_or_else(|| Err(format!("Invalid value: {:?}", val))),
-                    Err(e) => Err(format!("{}", e)),
+        match response {
+            Ok(mut pdu) => {
+                if let Some((_, value)) = pdu.varbinds.next() {
+                    let status = get_status(value);
+
+                    return Ok(SwitchResult { port, status });
                 }
+
+                Err(SnmpError::OperationError(
+                    "No value found in response".to_string(),
+                ))
             }
-            Err(e) => Err(format!("{}", e)),
+            Err(e) => Err(SnmpError::OperationError(e.to_string())),
         }
     }
 
-    async fn set(
-        self,
-        socket_addr: SocketAddr,
-        community: Vec<u8>,
-        oid: ObjectIdentifier,
-        value: i32,
-        port: u32,
-    ) -> Result<SwitchResult, String> {
-        let client_result = Snmp2cClient::new(socket_addr, community, None, None, 0).await;
+    async fn set(mut self, oid: Oid<'_>, value: i64, port: u64) -> Result<SwitchResult, SnmpError> {
+        let port_value = Value::Integer(value);
+        let response = self.session.set(&[(&oid, port_value)]);
 
-        match client_result {
-            Ok(client) => {
-                let object_value = ObjectValue::Integer(value);
+        match response {
+            Ok(mut pdu) => {
+                if let Some((_, value)) = pdu.varbinds.next() {
+                    let status = get_status(value);
 
-                let result = client.set(oid, object_value).await;
-                match result {
-                    Ok(val) => val
-                        .as_i32()
-                        .map(|v| {
-                            if v == 1 {
-                                Ok(SwitchResult {
-                                    port,
-                                    status: "on".to_string(),
-                                })
-                            } else if v == 2 {
-                                Ok(SwitchResult {
-                                    port,
-                                    status: "off".to_string(),
-                                })
-                            } else {
-                                Err(format!("Invalid value: {}", v))
-                            }
-                        })
-                        .unwrap_or_else(|| Err(format!("Invalid value: {:?}", val))),
-                    Err(e) => Err(format!("{}", e)),
+                    return Ok(SwitchResult { port, status });
                 }
+
+                Err(SnmpError::OperationError(
+                    "No value found in response".to_string(),
+                ))
             }
-            Err(e) => Err(format!("{}", e)),
+
+            Err(e) => Err(SnmpError::OperationError(e.to_string())),
         }
     }
 }

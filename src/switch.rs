@@ -14,7 +14,7 @@ pub struct Switch {
     ip: String,
     brand: String,
     version: SNMPVersion,
-    ports: u32,
+    ports: u64,
     community: String,
     auth: SNMPAuth,
     auth_user: String,
@@ -24,7 +24,7 @@ pub struct Switch {
 }
 #[derive(Clone)]
 pub struct SwitchResult {
-    pub port: u32,
+    pub port: u64,
     pub status: String,
 }
 
@@ -102,7 +102,7 @@ impl Device for Switch {
             .interact()
             .unwrap();
 
-        let ports = dialoguer::Input::<u32>::new()
+        let ports = dialoguer::Input::<u64>::new()
             .with_prompt("Ports")
             .default(self.ports)
             .interact()
@@ -235,7 +235,7 @@ impl Switch {
             .interact()
             .unwrap();
 
-        let ports = dialoguer::Input::<u32>::new()
+        let ports = dialoguer::Input::<u64>::new()
             .with_prompt("Ports")
             .interact()
             .unwrap();
@@ -352,17 +352,17 @@ impl Switch {
         SocketAddr::new(ip_addr, 161)
     }
 
-    pub(crate) fn get_oid(&self) -> Vec<u32> {
+    pub(crate) fn get_oid(&self) -> Vec<u64> {
         let sob = SwitchOidBuilder::new();
         let oid = sob
             .get_switch_oid(self.brand.clone())
             .expect("Invalid brand");
 
         // Split the oid by '.' and convert each part to a u32
-        oid.split('.').map(|x| x.parse::<u32>().unwrap()).collect()
+        oid.split('.').map(|x| x.parse::<u64>().unwrap()).collect()
     }
 
-    pub(crate) fn get_ports(&self) -> Vec<u32> {
+    pub(crate) fn get_ports(&self) -> Vec<u64> {
         let ports_input = dialoguer::Input::<String>::new()
             .with_prompt("List of ports (ex: 1-6,8,10-12)")
             .default(format!("1-{}", self.ports))
@@ -387,7 +387,7 @@ impl Switch {
         self.version
     }
 
-    pub(crate) fn parse_ports(ports_input: String) -> Result<Vec<u32>, String> {
+    pub(crate) fn parse_ports(ports_input: String) -> Result<Vec<u64>, String> {
         let mut ports = Vec::new();
 
         for port in ports_input.split(',') {
@@ -403,11 +403,11 @@ impl Switch {
                 }
 
                 let start = range[0]
-                    .parse::<u32>()
+                    .parse::<u64>()
                     .map_err(|_| format!("Invalid port range: {}", ports_input))?;
 
                 let end = range[1]
-                    .parse::<u32>()
+                    .parse::<u64>()
                     .map_err(|_| format!("Invalid port range: {}", ports_input))?;
 
                 for i in start..=end {
@@ -415,7 +415,7 @@ impl Switch {
                 }
             } else {
                 ports.push(
-                    port.parse::<u32>()
+                    port.parse::<u64>()
                         .map_err(|_| format!("Invalid port range: {}", ports_input))?,
                 );
             }
@@ -426,7 +426,7 @@ impl Switch {
         Ok(ports)
     }
 
-    fn set(&self, value: i32) -> std::io::Result<()> {
+    fn set(&self, value: i64) -> std::io::Result<()> {
         let ports = self.get_ports();
 
         let client = Snmp::new();
