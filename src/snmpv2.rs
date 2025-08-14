@@ -1,5 +1,3 @@
-// use clent::CLient;
-
 use crate::utils::get_status;
 use crate::{errors::SnmpError, snmp::SnmpClient, switch::SwitchResult};
 use snmp2::{Oid, SyncSession, Value};

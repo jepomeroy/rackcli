@@ -1,6 +1,5 @@
 use crate::device::Device;
 use colored::Colorize;
-use dialoguer;
 use serde::{Deserialize, Serialize};
 
 use crate::snmp::Snmp;
@@ -36,16 +35,21 @@ pub enum SNMPVersion {
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Copy)]
 pub enum SNMPAuth {
-    NONE,
-    MD5,
-    SHA,
+    Md5,
+    Sha1,
+    Sha224,
+    Sha256,
+    Sha384,
+    Sha512,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Clone, Copy)]
 pub enum SNMPEncryption {
-    NONE,
-    DES,
-    AES,
+    None,
+    Des,
+    Aes128,
+    Aes192,
+    Aes256,
 }
 
 impl Device for Switch {
@@ -92,8 +96,8 @@ impl Device for Switch {
         let mut username = String::new();
         let mut password = String::new();
         let mut community = String::new();
-        let mut auth = SNMPAuth::NONE;
-        let mut encryption = SNMPEncryption::NONE;
+        let mut auth = SNMPAuth::Md5;
+        let mut encryption = SNMPEncryption::None;
         let mut encryption_pass = String::new();
 
         let ip = dialoguer::Input::<String>::new()
@@ -145,49 +149,57 @@ impl Device for Switch {
             auth = match dialoguer::Select::new()
                 .with_prompt("SNMP Authentication")
                 .default(self.auth as usize)
-                .item("None")
                 .item("MD5")
-                .item("SHA")
+                .item("SHA1")
+                .item("SHA224")
+                .item("SHA256")
+                .item("SHA384")
+                .item("SHA512")
                 .interact()
                 .unwrap()
             {
-                0 => SNMPAuth::NONE,
-                1 => SNMPAuth::MD5,
-                2 => SNMPAuth::SHA,
+                0 => SNMPAuth::Md5,
+                1 => SNMPAuth::Sha1,
+                2 => SNMPAuth::Sha224,
+                3 => SNMPAuth::Sha256,
+                4 => SNMPAuth::Sha384,
+                5 => SNMPAuth::Sha512,
                 _ => unreachable!(),
             };
 
-            if auth != SNMPAuth::NONE {
-                username = dialoguer::Input::<String>::new()
-                    .with_prompt("Username")
-                    .default(self.auth_user.clone())
-                    .interact()
-                    .unwrap();
+            username = dialoguer::Input::<String>::new()
+                .with_prompt("Username")
+                .default(self.auth_user.clone())
+                .interact()
+                .unwrap();
 
-                password = dialoguer::Password::new()
-                    .with_prompt("Password (blank to prompt each time)")
-                    .allow_empty_password(true)
-                    .with_confirmation("Confirm Password", "Passwords do not match")
-                    .interact()
-                    .unwrap();
-            }
+            password = dialoguer::Password::new()
+                .with_prompt("Password (blank to prompt each time)")
+                .allow_empty_password(true)
+                .with_confirmation("Confirm Password", "Passwords do not match")
+                .interact()
+                .unwrap();
 
             encryption = match dialoguer::Select::new()
                 .with_prompt("SNMP Encryption")
                 .default(self.encryption as usize)
                 .item("None")
                 .item("DES")
-                .item("AES")
+                .item("AES128")
+                .item("AES192")
+                .item("AES256")
                 .interact()
                 .unwrap()
             {
-                0 => SNMPEncryption::NONE,
-                1 => SNMPEncryption::DES,
-                2 => SNMPEncryption::AES,
+                0 => SNMPEncryption::None,
+                1 => SNMPEncryption::Des,
+                2 => SNMPEncryption::Aes128,
+                3 => SNMPEncryption::Aes192,
+                4 => SNMPEncryption::Aes256,
                 _ => unreachable!(),
             };
 
-            if encryption != SNMPEncryption::NONE {
+            if encryption != SNMPEncryption::None {
                 encryption_pass = dialoguer::Password::new()
                     .with_prompt("Encryption Password")
                     .with_confirmation("Confirm Password", "Passwords do not match")
@@ -214,8 +226,8 @@ impl Switch {
         let mut username = String::new();
         let mut password = String::new();
         let mut community = String::new();
-        let mut auth = SNMPAuth::NONE;
-        let mut encryption = SNMPEncryption::NONE;
+        let mut auth = SNMPAuth::Md5;
+        let mut encryption = SNMPEncryption::None;
         let mut encryption_pass = String::new();
 
         let name = dialoguer::Input::<String>::new()
@@ -270,48 +282,56 @@ impl Switch {
             auth = match dialoguer::Select::new()
                 .with_prompt("SNMP Authentication")
                 .default(0)
-                .item("None")
                 .item("MD5")
-                .item("SHA")
+                .item("SHA1")
+                .item("SHA224")
+                .item("SHA256")
+                .item("SHA384")
+                .item("SHA512")
                 .interact()
                 .unwrap()
             {
-                0 => SNMPAuth::NONE,
-                1 => SNMPAuth::MD5,
-                2 => SNMPAuth::SHA,
+                0 => SNMPAuth::Md5,
+                1 => SNMPAuth::Sha1,
+                2 => SNMPAuth::Sha224,
+                3 => SNMPAuth::Sha256,
+                4 => SNMPAuth::Sha384,
+                5 => SNMPAuth::Sha512,
                 _ => unreachable!(),
             };
 
-            if auth != SNMPAuth::NONE {
-                username = dialoguer::Input::<String>::new()
-                    .with_prompt("Username")
-                    .interact()
-                    .unwrap();
+            username = dialoguer::Input::<String>::new()
+                .with_prompt("Username")
+                .interact()
+                .unwrap();
 
-                password = dialoguer::Password::new()
-                    .with_prompt("Password (blank to prompt each time)")
-                    .allow_empty_password(true)
-                    .with_confirmation("Confirm Password", "Passwords do not match")
-                    .interact()
-                    .unwrap();
-            }
+            password = dialoguer::Password::new()
+                .with_prompt("Password (blank to prompt each time)")
+                .allow_empty_password(true)
+                .with_confirmation("Confirm Password", "Passwords do not match")
+                .interact()
+                .unwrap();
 
             encryption = match dialoguer::Select::new()
                 .with_prompt("SNMP Encryption")
                 .default(0)
                 .item("None")
                 .item("DES")
-                .item("AES")
+                .item("AES128")
+                .item("AES192")
+                .item("AES256")
                 .interact()
                 .unwrap()
             {
-                0 => SNMPEncryption::NONE,
-                1 => SNMPEncryption::DES,
-                2 => SNMPEncryption::AES,
+                0 => SNMPEncryption::None,
+                1 => SNMPEncryption::Des,
+                2 => SNMPEncryption::Aes128,
+                3 => SNMPEncryption::Aes192,
+                4 => SNMPEncryption::Aes256,
                 _ => unreachable!(),
             };
 
-            if encryption != SNMPEncryption::NONE {
+            if encryption != SNMPEncryption::None {
                 encryption_pass = dialoguer::Password::new()
                     .with_prompt("Encryption Password")
                     .with_confirmation("Confirm Password", "Passwords do not match")
@@ -339,8 +359,8 @@ impl Switch {
         self.auth
     }
 
-    pub(crate) fn get_auth_password(&self) -> &str {
-        &self.auth_pass
+    pub(crate) fn get_auth_password(&self) -> &[u8] {
+        &self.auth_pass.as_bytes()
     }
 
     pub(crate) fn get_community(&self) -> &str {
@@ -376,11 +396,11 @@ impl Switch {
         self.encryption
     }
 
-    pub(crate) fn get_privacy_password(&self) -> &str {
-        &self.encryption_pass
+    pub(crate) fn get_privacy_password(&self) -> &[u8] {
+        &self.encryption_pass.as_bytes()
     }
-    pub(crate) fn get_username(&self) -> &str {
-        &self.auth_user
+    pub(crate) fn get_username(&self) -> &[u8] {
+        &self.auth_user.as_bytes()
     }
 
     pub(crate) fn get_version(&self) -> SNMPVersion {
@@ -478,9 +498,12 @@ impl std::fmt::Display for SNMPVersion {
 impl std::fmt::Display for SNMPAuth {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SNMPAuth::NONE => write!(f, "None"),
-            SNMPAuth::MD5 => write!(f, "MD5"),
-            SNMPAuth::SHA => write!(f, "SHA"),
+            SNMPAuth::Md5 => write!(f, "Md5"),
+            SNMPAuth::Sha1 => write!(f, "SHA1"),
+            SNMPAuth::Sha224 => write!(f, "SHA224"),
+            SNMPAuth::Sha256 => write!(f, "SHA256"),
+            SNMPAuth::Sha384 => write!(f, "SHA384"),
+            SNMPAuth::Sha512 => write!(f, "SHA512"),
         }
     }
 }
@@ -488,9 +511,11 @@ impl std::fmt::Display for SNMPAuth {
 impl std::fmt::Display for SNMPEncryption {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SNMPEncryption::NONE => write!(f, "None"),
-            SNMPEncryption::DES => write!(f, "DES"),
-            SNMPEncryption::AES => write!(f, "AES"),
+            SNMPEncryption::None => write!(f, "None"),
+            SNMPEncryption::Des => write!(f, "DES"),
+            SNMPEncryption::Aes128 => write!(f, "AES128"),
+            SNMPEncryption::Aes192 => write!(f, "AES192"),
+            SNMPEncryption::Aes256 => write!(f, "AES256"),
         }
     }
 }

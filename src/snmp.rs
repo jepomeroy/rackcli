@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use crate::errors::SnmpError;
 use crate::snmpv2::SnmpV2Client;
+use crate::snmpv3::SnmpV3Client;
 use crate::switch::{SNMPVersion, Switch, SwitchResult};
 use futures::executor::block_on;
 use snmp2::Oid;
@@ -56,7 +57,45 @@ impl Snmp {
 
                 Ok(switch_results)
             }
-            _ => todo!(),
+            SNMPVersion::V3 => {
+                let mut switch_results = Vec::new();
+                let mut futures = Vec::new();
+                for port in ports.iter() {
+                    let oid = Snmp::make_oid(switch.get_oid(), *port);
+                    let v3 = SnmpV3Client::new(
+                        switch.get_socket_addr(),
+                        switch.get_username(),
+                        switch.get_auth_password(),
+                        switch.get_auth_protocol(),
+                        switch.get_privacy_protocol(),
+                        switch.get_privacy_password(),
+                        Some(Duration::from_secs(5)),
+                    )?;
+
+                    futures.push(spawn(v3.get(oid, *port)));
+                }
+
+                let mut results = Vec::new();
+                for future in futures {
+                    results.push(block_on(future));
+                }
+
+                // Print the results
+                for result_result in results {
+                    match result_result {
+                        Ok(result) => {
+                            if let Ok(switch_result) = result {
+                                switch_results.push(switch_result.clone());
+                            }
+                        }
+                        Err(e) => {
+                            println!("{}", e);
+                        }
+                    }
+                }
+
+                Ok(switch_results)
+            }
         }
     }
 

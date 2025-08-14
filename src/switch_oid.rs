@@ -30,7 +30,8 @@ impl SwitchOidBuilder {
     fn build() -> Vec<SwitchOid> {
         let mut switch_oids = Vec::new();
 
-        // Netgear oids
+        // List of Switch OIDs and their on and off value
+        // Only Netgear is defined here
         switch_oids.push(SwitchOid::new(
             "Netgear".to_string(),
             "1.3.6.1.2.1.105.1.1.1.3.1".to_string(),

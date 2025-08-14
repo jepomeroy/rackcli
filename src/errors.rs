@@ -7,10 +7,4 @@ pub enum SnmpError {
 
     #[error("SNMP operation failed: {0}")]
     OperationError(String),
-
-    #[error("Invalid SNMP value: {0}")]
-    InvalidValue(String),
-
-    #[error("SNMP OID not found: {0}")]
-    OidNotFound(String),
 }

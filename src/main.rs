@@ -4,6 +4,7 @@ mod errors;
 mod rackcliargs;
 mod snmp;
 mod snmpv2;
+mod snmpv3;
 mod switch;
 mod switch_oid;
 mod utils;
