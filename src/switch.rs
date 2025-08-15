@@ -33,7 +33,7 @@ pub enum SNMPVersion {
     V3,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone, Copy)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Copy, Debug)]
 pub enum SNMPAuth {
     Md5,
     Sha1,
@@ -43,7 +43,7 @@ pub enum SNMPAuth {
     Sha512,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone, Copy)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Copy, Debug)]
 pub enum SNMPEncryption {
     None,
     Des,

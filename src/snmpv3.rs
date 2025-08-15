@@ -19,6 +19,11 @@ impl SnmpV3Client {
         encryption_key: &[u8],
         timeout: Option<Duration>,
     ) -> Result<Self, SnmpError> {
+        if password.is_empty() {
+            return Err(SnmpError::SessionError(
+                "Authentication password cannot be empty for SNMP v3".to_string(),
+            ));
+        }
         let auth = match auth_protocol {
             SNMPAuth::Md5 => AuthProtocol::Md5,
             SNMPAuth::Sha1 => AuthProtocol::Sha1,
@@ -48,11 +53,20 @@ impl SnmpV3Client {
         };
 
         match SyncSession::new_v3(socket_addr, timeout, 0, security) {
-            Ok(mut session) => match session.init() {
-                Ok(_) => Ok(Self { session }),
-                Err(e) => Err(SnmpError::SessionError(e.to_string())),
-            },
-            Err(e) => Err(SnmpError::SessionError(e.to_string())),
+            Ok(mut session) => {
+                // First attempt to discover the engine ID
+                match session.init() {
+                    Ok(_) => Ok(Self { session }),
+                    Err(e) => Err(SnmpError::SessionError(format!(
+                        "Session init failed: {}",
+                        e
+                    ))),
+                }
+            }
+            Err(e) => Err(SnmpError::SessionError(format!(
+                "Session creation failed: {}",
+                e
+            ))),
         }
     }
 }
@@ -61,7 +75,13 @@ impl SnmpClient for SnmpV3Client {
     async fn get(mut self, oid: Oid<'_>, port: u64) -> Result<SwitchResult, SnmpError> {
         let response = self.session.get(&oid);
 
-        println!("{:?}", response);
+        let response = match response {
+            Err(snmp2::Error::AuthUpdated) => {
+                // Authentication keys have been updated, retry the GET request
+                self.session.get(&oid)
+            }
+            other => other,
+        };
 
         match response {
             Ok(mut pdu) => {
@@ -82,6 +102,15 @@ impl SnmpClient for SnmpV3Client {
     async fn set(mut self, oid: Oid<'_>, value: i64, port: u64) -> Result<SwitchResult, SnmpError> {
         let port_value = Value::Integer(value);
         let response = self.session.set(&[(&oid, port_value)]);
+
+        let response = match response {
+            Err(snmp2::Error::AuthUpdated) => {
+                // Authentication keys have been updated, retry the SET request
+                let retry_value = Value::Integer(value);
+                self.session.set(&[(&oid, retry_value)])
+            }
+            other => other,
+        };
 
         match response {
             Ok(mut pdu) => {
