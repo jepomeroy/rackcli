@@ -85,7 +85,7 @@ fn enable_wol_device() {
 }
 
 // Disable commands
-fn disble_switch() {
+fn disable_switch() {
     let config = read_config();
     config.disable_switch();
 }
