@@ -108,7 +108,7 @@ async fn main() {
             rackcliargs::SwitchSubCommand::List => list_switches(),
             rackcliargs::SwitchSubCommand::Update => update_switch(),
             rackcliargs::SwitchSubCommand::Enable => enable_switch(),
-            rackcliargs::SwitchSubCommand::Disable => disble_switch(),
+            rackcliargs::SwitchSubCommand::Disable => disable_switch(),
             rackcliargs::SwitchSubCommand::Status => status_switch(),
         },
         rackcliargs::DeviceType::Wol(wol) => match wol.command {
