@@ -57,7 +57,7 @@ impl Device for Wol {
     }
 
     fn status(&self) -> std::io::Result<()> {
-        unimplemented!();
+        Err(std::io::Error::new(std::io::ErrorKind::Other, "status not implemented"))
     }
 }
 
