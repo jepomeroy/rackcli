@@ -477,7 +477,18 @@ impl std::fmt::Display for SwitchResult {
                 write!(f, "Port: {}  - {}", self.port, self.status.red())
             }
         } else {
-            if self.status == "on" {
+const STATUS_ON: &str = "on";
+
+impl std::fmt::Display for SwitchResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.port < 10 {
+            if self.status == STATUS_ON {
+                write!(f, "Port: {}  - {}", self.port, self.status.green())
+            } else {
+                write!(f, "Port: {}  - {}", self.port, self.status.red())
+            }
+        } else {
+            if self.status == STATUS_ON {
                 write!(f, "Port: {} - {}", self.port, self.status.green())
             } else {
                 write!(f, "Port: {} - {}", self.port, self.status.red())
