@@ -184,7 +184,6 @@ impl Snmp {
     }
 
     fn make_oid(oid_vec: Vec<u64>, port: u64) -> Oid<'static> {
-    fn make_oid(oid_vec: &[u64], port: u64) -> Oid<'static> {
         let mut new_vec = oid_vec.to_vec();
         new_vec.push(port);
 

@@ -52,6 +52,8 @@ pub enum SNMPEncryption {
     Aes256,
 }
 
+const STATUS_ON: &str = "on";
+
 impl Device for Switch {
     fn disable(&self) -> std::io::Result<()> {
         let off = SwitchOidBuilder::new()
@@ -471,17 +473,6 @@ impl Switch {
 impl std::fmt::Display for SwitchResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.port < 10 {
-            if self.status == "on" {
-                write!(f, "Port: {}  - {}", self.port, self.status.green())
-            } else {
-                write!(f, "Port: {}  - {}", self.port, self.status.red())
-            }
-        } else {
-const STATUS_ON: &str = "on";
-
-impl std::fmt::Display for SwitchResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.port < 10 {
             if self.status == STATUS_ON {
                 write!(f, "Port: {}  - {}", self.port, self.status.green())
             } else {
@@ -492,15 +483,7 @@ impl std::fmt::Display for SwitchResult {
                 write!(f, "Port: {} - {}", self.port, self.status.green())
             } else {
                 write!(f, "Port: {} - {}", self.port, self.status.red())
-        let colored_status = if self.status == "on" {
-            self.status.green()
-        } else {
-            self.status.red()
-        };
-        if self.port < 10 {
-            write!(f, "Port: {}  - {}", self.port, colored_status)
-        } else {
-            write!(f, "Port: {} - {}", self.port, colored_status)
+            }
         }
     }
 }
