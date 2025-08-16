@@ -1,4 +1,4 @@
-struct SwitchOid {
+pub struct SwitchOid {
     name: String,
     poe_oid: String,
     on: i64,
