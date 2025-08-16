@@ -11,7 +11,7 @@ pub struct Wol {
 
 impl Device for Wol {
     fn disable(&self) -> std::io::Result<()> {
-        unimplemented!();
+        Err(std::io::Error::new(std::io::ErrorKind::Other, "Disable not implemented for Wol"))
     }
 
     fn update(&mut self) {
