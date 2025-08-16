@@ -492,7 +492,15 @@ impl std::fmt::Display for SwitchResult {
                 write!(f, "Port: {} - {}", self.port, self.status.green())
             } else {
                 write!(f, "Port: {} - {}", self.port, self.status.red())
-            }
+        let colored_status = if self.status == "on" {
+            self.status.green()
+        } else {
+            self.status.red()
+        };
+        if self.port < 10 {
+            write!(f, "Port: {}  - {}", self.port, colored_status)
+        } else {
+            write!(f, "Port: {} - {}", self.port, colored_status)
         }
     }
 }
