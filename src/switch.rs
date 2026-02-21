@@ -52,7 +52,7 @@ pub enum SNMPEncryption {
     Aes256,
 }
 
-const STATUS_ON: &str = "on";
+const STATUS_ON: &str = "On";
 
 impl Device for Switch {
     fn disable(&self) -> std::io::Result<()> {
@@ -489,18 +489,10 @@ impl Switch {
 
 impl std::fmt::Display for SwitchResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.port < 10 {
-            if self.status == STATUS_ON {
-                write!(f, "Port: {}  - {}", self.port, self.status.green())
-            } else {
-                write!(f, "Port: {}  - {}", self.port, self.status.red())
-            }
+        if self.status == STATUS_ON {
+            write!(f, "Port: {:2} - {}", self.port, self.status.green())
         } else {
-            if self.status == STATUS_ON {
-                write!(f, "Port: {} - {}", self.port, self.status.green())
-            } else {
-                write!(f, "Port: {} - {}", self.port, self.status.red())
-            }
+            write!(f, "Port: {:2} - {}", self.port, self.status.red())
         }
     }
 }
