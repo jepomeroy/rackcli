@@ -12,6 +12,7 @@ mod wol;
 
 use clap::Parser;
 use config::read_config;
+use openssl::provider::Provider;
 use rackcliargs::RackCliArgs;
 use switch::Switch;
 use wol::Wol;
@@ -98,6 +99,12 @@ fn status_switch() {
 
 #[tokio::main]
 async fn main() {
+    // Load OpenSSL legacy provider to enable DES and other legacy ciphers
+    let _legacy = Provider::load(None, "legacy")
+        .expect("Failed to load OpenSSL legacy provider");
+    let _default = Provider::load(None, "default")
+        .expect("Failed to load OpenSSL default provider");
+
     let args = RackCliArgs::parse();
 
     match args.device_type {

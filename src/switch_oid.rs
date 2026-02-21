@@ -30,11 +30,49 @@ impl SwitchOidBuilder {
     fn build() -> Vec<SwitchOid> {
         let mut switch_oids = Vec::new();
 
-        // List of Switch OIDs and their on and off value
-        // Only Netgear is defined here
+        // Standard IEEE 802.3af PoE MIB OID: pethPsePortAdminEnable
+        // 1 = enabled (on), 2 = disabled (off)
+        let standard_poe_oid = "1.3.6.1.2.1.105.1.1.1.3.1".to_string();
+
+        switch_oids.push(SwitchOid::new(
+            "Aruba".to_string(),
+            standard_poe_oid.clone(),
+            1,
+            2,
+        ));
+        switch_oids.push(SwitchOid::new(
+            "Cisco".to_string(),
+            standard_poe_oid.clone(),
+            1,
+            2,
+        ));
+        switch_oids.push(SwitchOid::new(
+            "Dell".to_string(),
+            standard_poe_oid.clone(),
+            1,
+            2,
+        ));
+        switch_oids.push(SwitchOid::new(
+            "Juniper".to_string(),
+            standard_poe_oid.clone(),
+            1,
+            2,
+        ));
         switch_oids.push(SwitchOid::new(
             "Netgear".to_string(),
-            "1.3.6.1.2.1.105.1.1.1.3.1".to_string(),
+            standard_poe_oid.clone(),
+            1,
+            2,
+        ));
+        switch_oids.push(SwitchOid::new(
+            "TP-Link".to_string(),
+            standard_poe_oid.clone(),
+            1,
+            2,
+        ));
+        switch_oids.push(SwitchOid::new(
+            "Ubiquiti".to_string(),
+            standard_poe_oid,
             1,
             2,
         ));

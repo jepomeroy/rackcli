@@ -52,7 +52,7 @@ pub enum SNMPEncryption {
     Aes256,
 }
 
-const STATUS_ON: &str = "on";
+const STATUS_ON: &str = "On";
 
 impl Device for Switch {
     fn disable(&self) -> std::io::Result<()> {
@@ -258,6 +258,7 @@ impl Switch {
             dialoguer::Select::new()
                 .with_prompt("Brand")
                 .items(sob.get_oid_names().as_slice())
+                .default(0)
                 .interact()
                 .unwrap(),
         );
@@ -361,8 +362,16 @@ impl Switch {
         self.auth
     }
 
-    pub(crate) fn get_auth_password(&self) -> &[u8] {
-        &self.auth_pass.as_bytes()
+    pub(crate) fn get_auth_password(&self) -> Vec<u8> {
+        if self.auth_pass.is_empty() {
+            dialoguer::Password::new()
+                .with_prompt("Auth Password")
+                .interact()
+                .unwrap()
+                .into_bytes()
+        } else {
+            self.auth_pass.as_bytes().to_vec()
+        }
     }
 
     pub(crate) fn get_community(&self) -> &str {
@@ -398,8 +407,16 @@ impl Switch {
         self.encryption
     }
 
-    pub(crate) fn get_privacy_password(&self) -> &[u8] {
-        &self.encryption_pass.as_bytes()
+    pub(crate) fn get_privacy_password(&self) -> Vec<u8> {
+        if self.encryption != SNMPEncryption::None && self.encryption_pass.is_empty() {
+            dialoguer::Password::new()
+                .with_prompt("Encryption Password")
+                .interact()
+                .unwrap()
+                .into_bytes()
+        } else {
+            self.encryption_pass.as_bytes().to_vec()
+        }
     }
     pub(crate) fn get_username(&self) -> &[u8] {
         &self.auth_user.as_bytes()
@@ -472,18 +489,10 @@ impl Switch {
 
 impl std::fmt::Display for SwitchResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.port < 10 {
-            if self.status == STATUS_ON {
-                write!(f, "Port: {}  - {}", self.port, self.status.green())
-            } else {
-                write!(f, "Port: {}  - {}", self.port, self.status.red())
-            }
+        if self.status == STATUS_ON {
+            write!(f, "Port: {:2} - {}", self.port, self.status.green())
         } else {
-            if self.status == STATUS_ON {
-                write!(f, "Port: {} - {}", self.port, self.status.green())
-            } else {
-                write!(f, "Port: {} - {}", self.port, self.status.red())
-            }
+            write!(f, "Port: {:2} - {}", self.port, self.status.red())
         }
     }
 }

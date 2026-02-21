@@ -60,15 +60,17 @@ impl Snmp {
             SNMPVersion::V3 => {
                 let mut switch_results = Vec::new();
                 let mut futures = Vec::new();
+                let auth_password = switch.get_auth_password();
+                let privacy_password = switch.get_privacy_password();
                 for port in ports.iter() {
                     let oid = Snmp::make_oid(switch.get_oid(), *port);
                     let v3 = SnmpV3Client::new(
                         switch.get_socket_addr(),
                         switch.get_username(),
-                        switch.get_auth_password(),
+                        &auth_password,
                         switch.get_auth_protocol(),
                         switch.get_privacy_protocol(),
-                        switch.get_privacy_password(),
+                        &privacy_password,
                         Some(Duration::from_secs(5)),
                     )?;
 
@@ -144,15 +146,17 @@ impl Snmp {
             SNMPVersion::V3 => {
                 let mut switch_results = Vec::new();
                 let mut futures = Vec::new();
+                let auth_password = switch.get_auth_password();
+                let privacy_password = switch.get_privacy_password();
                 for port in ports.iter() {
                     let oid = Snmp::make_oid(switch.get_oid(), *port);
                     let v3 = SnmpV3Client::new(
                         switch.get_socket_addr(),
                         switch.get_username(),
-                        switch.get_auth_password(),
+                        &auth_password,
                         switch.get_auth_protocol(),
                         switch.get_privacy_protocol(),
-                        switch.get_privacy_password(),
+                        &privacy_password,
                         Some(Duration::from_secs(5)),
                     )?;
 
