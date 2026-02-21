@@ -704,6 +704,7 @@ dependencies = [
  "dialoguer",
  "directories",
  "futures",
+ "openssl",
  "regex",
  "serde",
  "snmp2",

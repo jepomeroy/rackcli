@@ -361,8 +361,16 @@ impl Switch {
         self.auth
     }
 
-    pub(crate) fn get_auth_password(&self) -> &[u8] {
-        &self.auth_pass.as_bytes()
+    pub(crate) fn get_auth_password(&self) -> Vec<u8> {
+        if self.auth_pass.is_empty() {
+            dialoguer::Password::new()
+                .with_prompt("Auth Password")
+                .interact()
+                .unwrap()
+                .into_bytes()
+        } else {
+            self.auth_pass.as_bytes().to_vec()
+        }
     }
 
     pub(crate) fn get_community(&self) -> &str {
@@ -398,8 +406,16 @@ impl Switch {
         self.encryption
     }
 
-    pub(crate) fn get_privacy_password(&self) -> &[u8] {
-        &self.encryption_pass.as_bytes()
+    pub(crate) fn get_privacy_password(&self) -> Vec<u8> {
+        if self.encryption != SNMPEncryption::None && self.encryption_pass.is_empty() {
+            dialoguer::Password::new()
+                .with_prompt("Encryption Password")
+                .interact()
+                .unwrap()
+                .into_bytes()
+        } else {
+            self.encryption_pass.as_bytes().to_vec()
+        }
     }
     pub(crate) fn get_username(&self) -> &[u8] {
         &self.auth_user.as_bytes()
