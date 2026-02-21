@@ -258,6 +258,7 @@ impl Switch {
             dialoguer::Select::new()
                 .with_prompt("Brand")
                 .items(sob.get_oid_names().as_slice())
+                .default(0)
                 .interact()
                 .unwrap(),
         );
