@@ -1,4 +1,4 @@
-use crate::device::Device;
+use crate::{device::Device, keyring};
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
 
@@ -7,34 +7,41 @@ use crate::switch_oid::SwitchOidBuilder;
 
 use std::net::{IpAddr, SocketAddr};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Switch {
     pub name: String,
     ip: String,
     brand: String,
     version: SNMPVersion,
     ports: u64,
+    keyring: bool,
+    #[serde(skip)]
     community: String,
     auth: SNMPAuth,
     auth_user: String,
+    #[serde(skip)]
     auth_pass: String,
     encryption: SNMPEncryption,
+    #[serde(skip)]
     encryption_pass: String,
 }
+
 #[derive(Clone)]
 pub struct SwitchResult {
     pub port: u64,
     pub status: String,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone, Copy)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Copy, Default)]
 pub enum SNMPVersion {
     V2,
+    #[default]
     V3,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Copy, Debug, Default)]
 pub enum SNMPAuth {
+    #[default]
     Md5,
     Sha1,
     Sha224,
@@ -43,8 +50,9 @@ pub enum SNMPAuth {
     Sha512,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Clone, Copy, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Clone, Copy, Debug, Default)]
 pub enum SNMPEncryption {
+    #[default]
     None,
     Des,
     Aes128,
@@ -54,28 +62,154 @@ pub enum SNMPEncryption {
 
 const STATUS_ON: &str = "On";
 
+struct Credentials {
+    username: String,
+    password: String,
+    community: String,
+    auth: SNMPAuth,
+    encryption: SNMPEncryption,
+    encryption_pass: String,
+}
+
+fn collect_credentials(
+    version: SNMPVersion,
+    keyring: bool,
+    current: Option<&Switch>,
+) -> Credentials {
+    let mut username = current.map(|s| s.auth_user.clone()).unwrap_or_default();
+    let mut password = String::new();
+    let mut community = current.map(|s| s.community.clone()).unwrap_or_default();
+    let mut auth = current.map(|s| s.auth).unwrap_or_default();
+    let mut encryption = current.map(|s| s.encryption).unwrap_or_default();
+    let mut encryption_pass = String::new();
+
+    if version == SNMPVersion::V2 {
+        if keyring {
+            community = dialoguer::Input::<String>::new()
+                .with_prompt("Community")
+                .default(community)
+                .interact()
+                .unwrap();
+        }
+    } else {
+        auth = match dialoguer::Select::new()
+            .with_prompt("SNMP Authentication")
+            .default(auth as usize)
+            .item("MD5")
+            .item("SHA1")
+            .item("SHA224")
+            .item("SHA256")
+            .item("SHA384")
+            .item("SHA512")
+            .interact()
+            .unwrap()
+        {
+            0 => SNMPAuth::Md5,
+            1 => SNMPAuth::Sha1,
+            2 => SNMPAuth::Sha224,
+            3 => SNMPAuth::Sha256,
+            4 => SNMPAuth::Sha384,
+            5 => SNMPAuth::Sha512,
+            _ => unreachable!(),
+        };
+
+        username = dialoguer::Input::<String>::new()
+            .with_prompt("Username")
+            .default(username)
+            .interact()
+            .unwrap();
+
+        if keyring {
+            password = dialoguer::Password::new()
+                .with_prompt("Password")
+                .with_confirmation("Confirm Password", "Passwords do not match")
+                .interact()
+                .unwrap();
+        }
+
+        encryption = match dialoguer::Select::new()
+            .with_prompt("SNMP Encryption")
+            .default(encryption as usize)
+            .item("None")
+            .item("DES")
+            .item("AES128")
+            .item("AES192")
+            .item("AES256")
+            .interact()
+            .unwrap()
+        {
+            0 => SNMPEncryption::None,
+            1 => SNMPEncryption::Des,
+            2 => SNMPEncryption::Aes128,
+            3 => SNMPEncryption::Aes192,
+            4 => SNMPEncryption::Aes256,
+            _ => unreachable!(),
+        };
+
+        if encryption != SNMPEncryption::None && keyring {
+            encryption_pass = dialoguer::Password::new()
+                .with_prompt("Encryption Password")
+                .with_confirmation("Confirm Password", "Passwords do not match")
+                .interact()
+                .unwrap();
+        }
+    }
+
+    Credentials {
+        username,
+        password,
+        community,
+        auth,
+        encryption,
+        encryption_pass,
+    }
+}
+
 impl Device for Switch {
-    fn disable(&self) -> std::io::Result<()> {
+    async fn disable(&mut self) -> std::io::Result<()> {
         let off = SwitchOidBuilder::new()
-            .get_off(self.brand.clone())
+            .get_off(&self.brand)
             .expect("Invalid brand");
 
-        self.set(off)
+        self.set(off).await
     }
 
-    fn enable(&self) -> std::io::Result<()> {
+    async fn enable(&mut self) -> std::io::Result<()> {
         let on = SwitchOidBuilder::new()
-            .get_on(self.brand.clone())
+            .get_on(&self.brand)
             .expect("Invalid brand");
 
-        self.set(on)
+        self.set(on).await
     }
 
-    fn status(&self) -> std::io::Result<()> {
-        let ports = self.get_ports();
+    async fn status(&mut self) {
+        if !self.keyring {
+            match self.version {
+                SNMPVersion::V2 => {
+                    self.community = dialoguer::Input::<String>::new()
+                        .with_prompt("Community")
+                        .default(self.community.clone())
+                        .interact()
+                        .unwrap();
+                }
+                SNMPVersion::V3 => {
+                    self.auth_pass = dialoguer::Password::new()
+                        .with_prompt("Auth Password")
+                        .interact()
+                        .unwrap();
+
+                    if self.encryption != SNMPEncryption::None {
+                        self.encryption_pass = dialoguer::Password::new()
+                            .with_prompt("Encryption Password")
+                            .interact()
+                            .unwrap();
+                    }
+                }
+            }
+        }
 
         let client = Snmp::new();
-        let results = client.get(self, ports);
+        let results = client.get(&self.clone()).await;
 
         match results {
             Ok(results) => {
@@ -88,19 +222,10 @@ impl Device for Switch {
                 println!("Error getting status for {}: {}", self.name, e);
             }
         }
-
-        Ok(())
     }
 
     fn update(&mut self) {
         let sob = SwitchOidBuilder::new();
-
-        let mut username = String::new();
-        let mut password = String::new();
-        let mut community = String::new();
-        let mut auth = SNMPAuth::Md5;
-        let mut encryption = SNMPEncryption::None;
-        let mut encryption_pass = String::new();
 
         let ip = dialoguer::Input::<String>::new()
             .with_prompt("IP")
@@ -141,96 +266,37 @@ impl Device for Switch {
             _ => unreachable!(),
         };
 
-        if version == SNMPVersion::V2 {
-            community = dialoguer::Input::<String>::new()
-                .with_prompt("Community")
-                .default(self.community.clone())
-                .interact()
-                .unwrap();
-        } else {
-            auth = match dialoguer::Select::new()
-                .with_prompt("SNMP Authentication")
-                .default(self.auth as usize)
-                .item("MD5")
-                .item("SHA1")
-                .item("SHA224")
-                .item("SHA256")
-                .item("SHA384")
-                .item("SHA512")
-                .interact()
-                .unwrap()
-            {
-                0 => SNMPAuth::Md5,
-                1 => SNMPAuth::Sha1,
-                2 => SNMPAuth::Sha224,
-                3 => SNMPAuth::Sha256,
-                4 => SNMPAuth::Sha384,
-                5 => SNMPAuth::Sha512,
-                _ => unreachable!(),
-            };
+        let keyring = dialoguer::Select::new()
+            .with_prompt("Use system keystore for passwords? No will require you to input passwords on each run")
+            .default(if self.keyring { 0 } else { 1 })
+            .item("Yes")
+            .item("No")
+            .interact()
+            .unwrap()
+            == 0;
 
-            username = dialoguer::Input::<String>::new()
-                .with_prompt("Username")
-                .default(self.auth_user.clone())
-                .interact()
-                .unwrap();
+        let credentials = collect_credentials(version, keyring, Some(self));
 
-            password = dialoguer::Password::new()
-                .with_prompt("Password (blank to prompt each time)")
-                .allow_empty_password(true)
-                .with_confirmation("Confirm Password", "Passwords do not match")
-                .interact()
-                .unwrap();
-
-            encryption = match dialoguer::Select::new()
-                .with_prompt("SNMP Encryption")
-                .default(self.encryption as usize)
-                .item("None")
-                .item("DES")
-                .item("AES128")
-                .item("AES192")
-                .item("AES256")
-                .interact()
-                .unwrap()
-            {
-                0 => SNMPEncryption::None,
-                1 => SNMPEncryption::Des,
-                2 => SNMPEncryption::Aes128,
-                3 => SNMPEncryption::Aes192,
-                4 => SNMPEncryption::Aes256,
-                _ => unreachable!(),
-            };
-
-            if encryption != SNMPEncryption::None {
-                encryption_pass = dialoguer::Password::new()
-                    .with_prompt("Encryption Password")
-                    .with_confirmation("Confirm Password", "Passwords do not match")
-                    .interact()
-                    .unwrap();
-            }
+        if self.keyring && !keyring {
+            self.remove_keys();
         }
 
         self.ip = ip;
         self.ports = ports;
         self.brand = brand;
-        self.community = community;
-        self.auth = auth;
-        self.auth_user = username;
-        self.auth_pass = password;
-        self.encryption = encryption;
-        self.encryption_pass = encryption_pass;
+        self.community = credentials.community;
+        self.auth = credentials.auth;
+        self.keyring = keyring;
+        self.auth_user = credentials.username;
+        self.auth_pass = credentials.password;
+        self.encryption = credentials.encryption;
+        self.encryption_pass = credentials.encryption_pass;
     }
 }
 
 impl Switch {
     pub fn create(switch_names: Vec<String>) -> Self {
         let sob = SwitchOidBuilder::new();
-        let mut username = String::new();
-        let mut password = String::new();
-        let mut community = String::new();
-        let mut auth = SNMPAuth::Md5;
-        let mut encryption = SNMPEncryption::None;
-        let mut encryption_pass = String::new();
 
         let name = dialoguer::Input::<String>::new()
             .with_prompt("Name")
@@ -263,6 +329,15 @@ impl Switch {
                 .unwrap(),
         );
 
+        let keyring = dialoguer::Select::new()
+            .with_prompt("Use system keystore for passwords? No will require you to input passwords on each run")
+            .default(0)
+            .item("Yes")
+            .item("No")
+            .interact()
+            .unwrap()
+            == 0;
+
         let version = match dialoguer::Select::new()
             .with_prompt("SNMP Version")
             .default(0)
@@ -276,72 +351,7 @@ impl Switch {
             _ => unreachable!(),
         };
 
-        if version == SNMPVersion::V2 {
-            community = dialoguer::Input::<String>::new()
-                .with_prompt("Community")
-                .interact()
-                .unwrap();
-        } else {
-            auth = match dialoguer::Select::new()
-                .with_prompt("SNMP Authentication")
-                .default(0)
-                .item("MD5")
-                .item("SHA1")
-                .item("SHA224")
-                .item("SHA256")
-                .item("SHA384")
-                .item("SHA512")
-                .interact()
-                .unwrap()
-            {
-                0 => SNMPAuth::Md5,
-                1 => SNMPAuth::Sha1,
-                2 => SNMPAuth::Sha224,
-                3 => SNMPAuth::Sha256,
-                4 => SNMPAuth::Sha384,
-                5 => SNMPAuth::Sha512,
-                _ => unreachable!(),
-            };
-
-            username = dialoguer::Input::<String>::new()
-                .with_prompt("Username")
-                .interact()
-                .unwrap();
-
-            password = dialoguer::Password::new()
-                .with_prompt("Password (blank to prompt each time)")
-                .allow_empty_password(true)
-                .with_confirmation("Confirm Password", "Passwords do not match")
-                .interact()
-                .unwrap();
-
-            encryption = match dialoguer::Select::new()
-                .with_prompt("SNMP Encryption")
-                .default(0)
-                .item("None")
-                .item("DES")
-                .item("AES128")
-                .item("AES192")
-                .item("AES256")
-                .interact()
-                .unwrap()
-            {
-                0 => SNMPEncryption::None,
-                1 => SNMPEncryption::Des,
-                2 => SNMPEncryption::Aes128,
-                3 => SNMPEncryption::Aes192,
-                4 => SNMPEncryption::Aes256,
-                _ => unreachable!(),
-            };
-
-            if encryption != SNMPEncryption::None {
-                encryption_pass = dialoguer::Password::new()
-                    .with_prompt("Encryption Password")
-                    .with_confirmation("Confirm Password", "Passwords do not match")
-                    .interact()
-                    .unwrap();
-            }
-        }
+        let credentials = collect_credentials(version, keyring, None);
 
         Self {
             name,
@@ -349,20 +359,28 @@ impl Switch {
             ports,
             brand,
             version,
-            community,
-            auth,
-            auth_user: username,
-            auth_pass: password,
-            encryption,
-            encryption_pass,
+            community: credentials.community,
+            auth: credentials.auth,
+            keyring,
+            auth_user: credentials.username,
+            auth_pass: credentials.password,
+            encryption: credentials.encryption,
+            encryption_pass: credentials.encryption_pass,
         }
+    }
+
+    //
+    // Authentication and encryption getters
+    //
+    pub(crate) fn get_username(&self) -> &[u8] {
+        &self.auth_user.as_bytes()
     }
 
     pub(crate) fn get_auth_protocol(&self) -> SNMPAuth {
         self.auth
     }
 
-    pub(crate) fn get_auth_password(&self) -> Vec<u8> {
+    pub(crate) fn get_or_prompt_auth_password(&self) -> Vec<u8> {
         if self.auth_pass.is_empty() {
             dialoguer::Password::new()
                 .with_prompt("Auth Password")
@@ -374,10 +392,29 @@ impl Switch {
         }
     }
 
+    pub(crate) fn get_privacy_protocol(&self) -> SNMPEncryption {
+        self.encryption
+    }
+
+    pub(crate) fn get_or_prompt_privacy_password(&self) -> Vec<u8> {
+        if self.encryption != SNMPEncryption::None && self.encryption_pass.is_empty() {
+            dialoguer::Password::new()
+                .with_prompt("Encryption Password")
+                .interact()
+                .unwrap()
+                .into_bytes()
+        } else {
+            self.encryption_pass.as_bytes().to_vec()
+        }
+    }
+
     pub(crate) fn get_community(&self) -> &str {
         &self.community
     }
 
+    //
+    // Networking, OIDs, and ports
+    //
     pub(crate) fn get_socket_addr(&self) -> SocketAddr {
         let ip_addr: IpAddr = self.ip.parse().expect("Invalid IP address");
         SocketAddr::new(ip_addr, 161)
@@ -386,7 +423,7 @@ impl Switch {
     pub(crate) fn get_oid(&self) -> Vec<u64> {
         let sob = SwitchOidBuilder::new();
         let oid = sob
-            .get_switch_oid(self.brand.clone())
+            .get_switch_oid(&self.brand)
             .expect("Invalid brand");
 
         // Split the oid by '.' and convert each part to a u32
@@ -401,29 +438,6 @@ impl Switch {
             .unwrap();
 
         Switch::parse_ports(ports_input).expect("Invalid port range")
-    }
-
-    pub(crate) fn get_privacy_protocol(&self) -> SNMPEncryption {
-        self.encryption
-    }
-
-    pub(crate) fn get_privacy_password(&self) -> Vec<u8> {
-        if self.encryption != SNMPEncryption::None && self.encryption_pass.is_empty() {
-            dialoguer::Password::new()
-                .with_prompt("Encryption Password")
-                .interact()
-                .unwrap()
-                .into_bytes()
-        } else {
-            self.encryption_pass.as_bytes().to_vec()
-        }
-    }
-    pub(crate) fn get_username(&self) -> &[u8] {
-        &self.auth_user.as_bytes()
-    }
-
-    pub(crate) fn get_version(&self) -> SNMPVersion {
-        self.version
     }
 
     pub(crate) fn parse_ports(ports_input: String) -> Result<Vec<u64>, String> {
@@ -465,11 +479,34 @@ impl Switch {
         Ok(ports)
     }
 
-    fn set(&self, value: i64) -> std::io::Result<()> {
-        let ports = self.get_ports();
+    async fn set(&mut self, value: i64) -> std::io::Result<()> {
+        if !self.keyring {
+            match self.version {
+                SNMPVersion::V2 => {
+                    self.community = dialoguer::Input::<String>::new()
+                        .with_prompt("Community")
+                        .default(self.community.clone())
+                        .interact()
+                        .unwrap();
+                }
+                SNMPVersion::V3 => {
+                    self.auth_pass = dialoguer::Password::new()
+                        .with_prompt("Auth Password")
+                        .interact()
+                        .unwrap();
+
+                    if self.encryption != SNMPEncryption::None {
+                        self.encryption_pass = dialoguer::Password::new()
+                            .with_prompt("Encryption Password")
+                            .interact()
+                            .unwrap();
+                    }
+                }
+            }
+        }
 
         let client = Snmp::new();
-        let results = client.set(self, ports, value);
+        let results = client.set(&self.clone(), value).await;
 
         match results {
             Ok(results) => {
@@ -484,6 +521,136 @@ impl Switch {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn get_version(&self) -> SNMPVersion {
+        self.version
+    }
+
+    //
+    // Key ring functions
+    //
+    pub(crate) fn remove_keys(&self) {
+        if self.keyring {
+            match self.version {
+                SNMPVersion::V2 => {
+                    keyring::remove_key(&self.name, keyring::KeyRingType::Community)
+                        .unwrap_or_else(|e| {
+                            println!(
+                                "Error removing {} string for {}: {}",
+                                keyring::KeyRingType::Community,
+                                self.name,
+                                e
+                            )
+                        });
+                }
+                SNMPVersion::V3 => {
+                    keyring::remove_key(&self.name, keyring::KeyRingType::Auth).unwrap_or_else(
+                        |e| {
+                            println!(
+                                "Error removing {} password for {}: {}",
+                                keyring::KeyRingType::Auth,
+                                self.name,
+                                e
+                            )
+                        },
+                    );
+
+                    keyring::remove_key(&self.name, keyring::KeyRingType::Encrypt).unwrap_or_else(
+                        |e| {
+                            println!(
+                                "Error removing {} password for {}: {}",
+                                keyring::KeyRingType::Encrypt,
+                                self.name,
+                                e
+                            )
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    pub(crate) fn get_keys(&mut self) {
+        if !self.keyring {
+            return;
+        }
+
+        match self.version {
+            SNMPVersion::V2 => {
+                self.community = keyring::get_key(&self.name, keyring::KeyRingType::Community)
+                    .unwrap_or_else(|e| {
+                        println!("Error getting community string for {}: {}", self.name, e);
+                        String::new()
+                    });
+            }
+            SNMPVersion::V3 => {
+                self.auth_pass = keyring::get_key(&self.name, keyring::KeyRingType::Auth)
+                    .unwrap_or_else(|e| {
+                        println!(
+                            "Warning: could not load {} password for {}: {}",
+                            keyring::KeyRingType::Auth,
+                            self.name,
+                            e
+                        );
+                        String::new()
+                    });
+
+                self.encryption_pass = keyring::get_key(&self.name, keyring::KeyRingType::Encrypt)
+                    .unwrap_or_else(|e| {
+                        println!(
+                            "Warning: could not load {} password for {}: {}",
+                            keyring::KeyRingType::Encrypt,
+                            self.name,
+                            e
+                        );
+                        String::new()
+                    });
+            }
+        }
+    }
+
+    pub(crate) fn set_keys(&self) {
+        if self.keyring {
+            match self.version {
+                SNMPVersion::V2 => {
+                    keyring::set_key(&self.name, &self.community, keyring::KeyRingType::Community)
+                        .unwrap_or_else(|e| {
+                            println!(
+                                "Error storing {} string for {}: {}",
+                                keyring::KeyRingType::Community,
+                                self.name,
+                                e
+                            )
+                        });
+                }
+                SNMPVersion::V3 => {
+                    keyring::set_key(&self.name, &self.auth_pass, keyring::KeyRingType::Auth)
+                        .unwrap_or_else(|e| {
+                            println!(
+                                "Error storing {} password for {}: {}",
+                                keyring::KeyRingType::Auth,
+                                self.name,
+                                e
+                            )
+                        });
+
+                    keyring::set_key(
+                        &self.name,
+                        &self.encryption_pass,
+                        keyring::KeyRingType::Encrypt,
+                    )
+                    .unwrap_or_else(|e| {
+                        println!(
+                            "Error storing {} password for {}: {}",
+                            keyring::KeyRingType::Encrypt,
+                            self.name,
+                            e
+                        )
+                    });
+                }
+            }
+        }
     }
 }
 
@@ -534,17 +701,17 @@ impl std::fmt::Display for SNMPEncryption {
 impl std::fmt::Display for Switch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.version == SNMPVersion::V2 {
-            return write!(
+            write!(
                 f,
-                "  Name: {}\n  Addr: {}\n  Brand: {}\n  Ports: {}\n  Version: {}\n  Community: {}\n",
-                self.name, self.ip, self.brand, self.ports, self.version, self.community
-            );
+                "  Name: {}\n  Addr: {}\n  Brand: {}\n  Ports: {}\n  Keyring: {}\n  Version: {}\n  Community: {}\n",
+                self.name, self.ip, self.brand, self.ports, self.keyring, self.version, self.community
+            )
         } else {
-            return write!(
+            write!(
                 f,
-                "  Name: {}\n  Addr: {}\n  Brand: {}\n  Ports: {}\n  Version: {}\n  Username: {}\n  Auth: {}\n  Encryption: {}\n",
-                self.name, self.ip, self.brand, self.ports, self.version, self.auth_user, self.auth, self.encryption
-            );
+                "  Name: {}\n  Addr: {}\n  Brand: {}\n  Ports: {}\n  Keyring: {}\n  Version: {}\n  Username: {}\n  Auth: {}\n  Encryption: {}\n",
+                self.name, self.ip, self.brand, self.ports, self.keyring, self.version, self.auth_user, self.auth, self.encryption
+            )
         }
     }
 }

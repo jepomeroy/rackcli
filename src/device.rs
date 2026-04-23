@@ -1,6 +1,6 @@
 pub trait Device {
-    fn disable(&self) -> std::io::Result<()>;
-    fn enable(&self) -> std::io::Result<()>;
-    fn status(&self) -> std::io::Result<()>;
+    async fn disable(&mut self) -> std::io::Result<()>;
+    async fn enable(&mut self) -> std::io::Result<()>;
+    async fn status(&mut self);
     fn update(&mut self);
 }

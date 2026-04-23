@@ -38,7 +38,7 @@ impl SnmpV3Client {
             SNMPEncryption::Aes128 => Cipher::Aes128,
             SNMPEncryption::Aes192 => Cipher::Aes192,
             SNMPEncryption::Aes256 => Cipher::Aes256,
-            _ => Cipher::Des, // Default to DES if no encryption is specified
+            _ => unreachable!(),
         };
 
         let security = if encryption == SNMPEncryption::None {
@@ -84,17 +84,10 @@ impl SnmpClient for SnmpV3Client {
         };
 
         match response {
-            Ok(mut pdu) => {
-                if let Some((_, value)) = pdu.varbinds.next() {
-                    let status = get_status(value);
-
-                    return Ok(SwitchResult { port, status });
-                }
-
-                Err(SnmpError::OperationError(
-                    "No value found in response".to_string(),
-                ))
-            }
+            Ok(mut pdu) => match pdu.varbinds.next() {
+                Some((_, value)) => Ok(SwitchResult { port, status: get_status(value) }),
+                None => Err(SnmpError::OperationError("No value found in response".to_string())),
+            },
             Err(e) => Err(SnmpError::OperationError(e.to_string())),
         }
     }
@@ -113,18 +106,10 @@ impl SnmpClient for SnmpV3Client {
         };
 
         match response {
-            Ok(mut pdu) => {
-                if let Some((_, value)) = pdu.varbinds.next() {
-                    let status = get_status(value);
-
-                    return Ok(SwitchResult { port, status });
-                }
-
-                Err(SnmpError::OperationError(
-                    "No value found in response".to_string(),
-                ))
-            }
-
+            Ok(mut pdu) => match pdu.varbinds.next() {
+                Some((_, value)) => Ok(SwitchResult { port, status: get_status(value) }),
+                None => Err(SnmpError::OperationError("No value found in response".to_string())),
+            },
             Err(e) => Err(SnmpError::OperationError(e.to_string())),
         }
     }

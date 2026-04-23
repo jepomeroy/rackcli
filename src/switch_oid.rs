@@ -17,67 +17,26 @@ impl SwitchOid {
 }
 
 pub struct SwitchOidBuilder {
-    switch_oids: Vec<SwitchOid>,
+    switch_oids: [SwitchOid; 7],
 }
 
 impl SwitchOidBuilder {
     pub fn new() -> Self {
-        Self {
-            switch_oids: SwitchOidBuilder::build(),
-        }
-    }
-
-    fn build() -> Vec<SwitchOid> {
-        let mut switch_oids = Vec::new();
-
         // Standard IEEE 802.3af PoE MIB OID: pethPsePortAdminEnable
         // 1 = enabled (on), 2 = disabled (off)
-        let standard_poe_oid = "1.3.6.1.2.1.105.1.1.1.3.1".to_string();
+        let standard_poe_oid = "1.3.6.1.2.1.105.1.1.1.3.1";
 
-        switch_oids.push(SwitchOid::new(
-            "Aruba".to_string(),
-            standard_poe_oid.clone(),
-            1,
-            2,
-        ));
-        switch_oids.push(SwitchOid::new(
-            "Cisco".to_string(),
-            standard_poe_oid.clone(),
-            1,
-            2,
-        ));
-        switch_oids.push(SwitchOid::new(
-            "Dell".to_string(),
-            standard_poe_oid.clone(),
-            1,
-            2,
-        ));
-        switch_oids.push(SwitchOid::new(
-            "Juniper".to_string(),
-            standard_poe_oid.clone(),
-            1,
-            2,
-        ));
-        switch_oids.push(SwitchOid::new(
-            "Netgear".to_string(),
-            standard_poe_oid.clone(),
-            1,
-            2,
-        ));
-        switch_oids.push(SwitchOid::new(
-            "TP-Link".to_string(),
-            standard_poe_oid.clone(),
-            1,
-            2,
-        ));
-        switch_oids.push(SwitchOid::new(
-            "Ubiquiti".to_string(),
-            standard_poe_oid,
-            1,
-            2,
-        ));
+        let switch_oids = [
+            SwitchOid::new("Aruba".to_string(), standard_poe_oid.to_string(), 1, 2),
+            SwitchOid::new("Cisco".to_string(), standard_poe_oid.to_string(), 1, 2),
+            SwitchOid::new("Dell".to_string(), standard_poe_oid.to_string(), 1, 2),
+            SwitchOid::new("Juniper".to_string(), standard_poe_oid.to_string(), 1, 2),
+            SwitchOid::new("Netgear".to_string(), standard_poe_oid.to_string(), 1, 2),
+            SwitchOid::new("TP-Link".to_string(), standard_poe_oid.to_string(), 1, 2),
+            SwitchOid::new("Ubiquiti".to_string(), standard_poe_oid.to_string(), 1, 2),
+        ];
 
-        switch_oids
+        Self { switch_oids }
     }
 
     pub fn get_oid_names(&self) -> Vec<String> {
@@ -91,21 +50,21 @@ impl SwitchOidBuilder {
         self.switch_oids[index].name.clone()
     }
 
-    pub fn get_switch_oid(&self, name: String) -> Option<&String> {
+    pub fn get_switch_oid(&self, name: &str) -> Option<&String> {
         self.switch_oids
             .iter()
             .find(|switch_oid| switch_oid.name == name)
             .map(|switch_oid| &switch_oid.poe_oid)
     }
 
-    pub fn get_on(&self, name: String) -> Option<i64> {
+    pub fn get_on(&self, name: &str) -> Option<i64> {
         self.switch_oids
             .iter()
             .find(|switch_oid| switch_oid.name == name)
             .map(|switch_oid| switch_oid.on)
     }
 
-    pub fn get_off(&self, name: String) -> Option<i64> {
+    pub fn get_off(&self, name: &str) -> Option<i64> {
         self.switch_oids
             .iter()
             .find(|switch_oid| switch_oid.name == name)

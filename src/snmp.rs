@@ -4,9 +4,8 @@ use crate::errors::SnmpError;
 use crate::snmpv2::SnmpV2Client;
 use crate::snmpv3::SnmpV3Client;
 use crate::switch::{SNMPVersion, Switch, SwitchResult};
-use futures::executor::block_on;
 use snmp2::Oid;
-use tokio::spawn;
+use tokio::task::JoinSet;
 
 pub trait SnmpClient {
     async fn get(self, oid: Oid, port: u64) -> Result<SwitchResult, SnmpError>;
@@ -20,12 +19,13 @@ impl Snmp {
         Self {}
     }
 
-    pub fn get(&self, switch: &Switch, ports: Vec<u64>) -> Result<Vec<SwitchResult>, SnmpError> {
+    pub async fn get(&self, switch: &Switch) -> Result<Vec<SwitchResult>, SnmpError> {
+        let mut req_set = JoinSet::new();
+
         match switch.get_version() {
             SNMPVersion::V2 => {
                 let mut switch_results = Vec::new();
-                let mut futures = Vec::new();
-                for port in ports.iter() {
+                for port in switch.get_ports().iter() {
                     let oid = Snmp::make_oid(switch.get_oid(), *port);
                     let v2 = SnmpV2Client::new(
                         switch.get_socket_addr(),
@@ -33,25 +33,15 @@ impl Snmp {
                         Some(Duration::from_secs(5)),
                     )?;
 
-                    futures.push(spawn(v2.get(oid, *port)));
-                }
-
-                let mut results = Vec::new();
-                for future in futures {
-                    results.push(block_on(future));
+                    req_set.spawn(v2.get(oid, *port));
                 }
 
                 // Print the results
-                for result_result in results {
+                while let Some(result_result) = req_set.join_next().await {
                     match result_result {
-                        Ok(result) => {
-                            if let Ok(switch_result) = result {
-                                switch_results.push(switch_result.clone());
-                            }
-                        }
-                        Err(e) => {
-                            println!("{}", e);
-                        }
+                        Ok(Ok(switch_result)) => switch_results.push(switch_result),
+                        Ok(Err(e)) => println!("Error: {}", e),
+                        Err(e) => println!("Task error: {}", e),
                     }
                 }
 
@@ -59,10 +49,9 @@ impl Snmp {
             }
             SNMPVersion::V3 => {
                 let mut switch_results = Vec::new();
-                let mut futures = Vec::new();
-                let auth_password = switch.get_auth_password();
-                let privacy_password = switch.get_privacy_password();
-                for port in ports.iter() {
+                let auth_password = switch.get_or_prompt_auth_password();
+                let privacy_password = switch.get_or_prompt_privacy_password();
+                for port in switch.get_ports().iter() {
                     let oid = Snmp::make_oid(switch.get_oid(), *port);
                     let v3 = SnmpV3Client::new(
                         switch.get_socket_addr(),
@@ -74,25 +63,15 @@ impl Snmp {
                         Some(Duration::from_secs(5)),
                     )?;
 
-                    futures.push(spawn(v3.get(oid, *port)));
-                }
-
-                let mut results = Vec::new();
-                for future in futures {
-                    results.push(block_on(future));
+                    req_set.spawn(v3.get(oid, *port));
                 }
 
                 // Print the results
-                for result_result in results {
+                while let Some(result_result) = req_set.join_next().await {
                     match result_result {
-                        Ok(result) => {
-                            if let Ok(switch_result) = result {
-                                switch_results.push(switch_result.clone());
-                            }
-                        }
-                        Err(e) => {
-                            println!("{}", e);
-                        }
+                        Ok(Ok(switch_result)) => switch_results.push(switch_result),
+                        Ok(Err(e)) => println!("Error: {}", e),
+                        Err(e) => println!("Task error: {}", e),
                     }
                 }
 
@@ -101,17 +80,13 @@ impl Snmp {
         }
     }
 
-    pub fn set(
-        &self,
-        switch: &Switch,
-        ports: Vec<u64>,
-        value: i64,
-    ) -> Result<Vec<SwitchResult>, SnmpError> {
+    pub async fn set(&self, switch: &Switch, value: i64) -> Result<Vec<SwitchResult>, SnmpError> {
+        let mut req_set = JoinSet::new();
+
         match switch.get_version() {
             SNMPVersion::V2 => {
                 let mut switch_results = Vec::new();
-                let mut futures = Vec::new();
-                for port in ports.iter() {
+                for port in switch.get_ports().iter() {
                     let oid = Snmp::make_oid(switch.get_oid(), *port);
                     let v2 = SnmpV2Client::new(
                         switch.get_socket_addr(),
@@ -119,25 +94,15 @@ impl Snmp {
                         Some(Duration::from_secs(5)),
                     )?;
 
-                    futures.push(spawn(v2.set(oid, value, *port)));
-                }
-
-                let mut results = Vec::new();
-                for future in futures {
-                    results.push(block_on(future));
+                    req_set.spawn(v2.set(oid, value, *port));
                 }
 
                 // Print the results
-                for result_result in results {
+                while let Some(result_result) = req_set.join_next().await {
                     match result_result {
-                        Ok(result) => {
-                            if let Ok(switch_result) = result {
-                                switch_results.push(switch_result.clone());
-                            }
-                        }
-                        Err(e) => {
-                            println!("{}", e);
-                        }
+                        Ok(Ok(switch_result)) => switch_results.push(switch_result),
+                        Ok(Err(e)) => println!("Error: {}", e),
+                        Err(e) => println!("Task error: {}", e),
                     }
                 }
 
@@ -145,10 +110,9 @@ impl Snmp {
             }
             SNMPVersion::V3 => {
                 let mut switch_results = Vec::new();
-                let mut futures = Vec::new();
-                let auth_password = switch.get_auth_password();
-                let privacy_password = switch.get_privacy_password();
-                for port in ports.iter() {
+                let auth_password = switch.get_or_prompt_auth_password();
+                let privacy_password = switch.get_or_prompt_privacy_password();
+                for port in switch.get_ports().iter() {
                     let oid = Snmp::make_oid(switch.get_oid(), *port);
                     let v3 = SnmpV3Client::new(
                         switch.get_socket_addr(),
@@ -160,25 +124,15 @@ impl Snmp {
                         Some(Duration::from_secs(5)),
                     )?;
 
-                    futures.push(spawn(v3.set(oid, value, *port)));
-                }
-
-                let mut results = Vec::new();
-                for future in futures {
-                    results.push(block_on(future));
+                    req_set.spawn(v3.set(oid, value, *port));
                 }
 
                 // Print the results
-                for result_result in results {
+                while let Some(result_result) = req_set.join_next().await {
                     match result_result {
-                        Ok(result) => {
-                            if let Ok(switch_result) = result {
-                                switch_results.push(switch_result.clone());
-                            }
-                        }
-                        Err(e) => {
-                            println!("{}", e);
-                        }
+                        Ok(Ok(switch_result)) => switch_results.push(switch_result),
+                        Ok(Err(e)) => println!("Error: {}", e),
+                        Err(e) => println!("Task error: {}", e),
                     }
                 }
 

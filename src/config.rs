@@ -5,8 +5,10 @@ use crate::wol::Wol;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::Write;
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
-use toml;
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
@@ -18,7 +20,10 @@ pub fn read_config() -> Config {
     match Config::get_config_path() {
         Ok(config_path) => match fs::read_to_string(config_path) {
             Ok(toml_content) => {
-                let data: Config = toml::from_str(&toml_content).unwrap();
+                let mut data: Config = toml::from_str(&toml_content).unwrap();
+                data.switches.iter_mut().for_each(|switch| {
+                    switch.get_keys();
+                });
                 data
             }
             Err(_) => {
@@ -46,8 +51,8 @@ impl Config {
     }
 
     fn get_config_path() -> Result<PathBuf, String> {
-        let base_dirs =
-            ProjectDirs::from("com", "epomeroy", "rackcli").expect("Configuration path to exist");
+        let base_dirs = ProjectDirs::from("com", "epomeroy", "rackcli")
+            .ok_or_else(|| "Could not determine config directory (is $HOME set?)".to_string())?;
         fs::create_dir_all(base_dirs.config_dir()).expect("Create directories");
         Ok(base_dirs.config_dir().join("config.toml"))
     }
@@ -63,7 +68,23 @@ impl Config {
                 let toml_content = toml::to_string(&self);
 
                 match toml_content {
-                    Ok(s) => std::fs::write(config_path, s).unwrap(),
+                    Ok(s) => {
+                        match fs::OpenOptions::new()
+                            .read(true)
+                            .write(true)
+                            .create(true)
+                            .truncate(true)
+                            .mode(0o600)
+                            .open(&config_path)
+                        {
+                            Ok(mut file) => {
+                                if let Err(e) = file.write_all(s.as_bytes()) {
+                                    println!("Error writing config file: {}", e);
+                                }
+                            }
+                            Err(e) => println!("Error opening config file: {}", e),
+                        }
+                    }
                     Err(e) => println!("{}", e),
                 }
             }
@@ -71,10 +92,11 @@ impl Config {
         }
     }
 
-    ////////////////////////
-    /// Switch functions
-    ////////////////////////
+    //
+    // Switch functions
+    //
     pub fn add_switch(&mut self, switch: Switch) {
+        switch.set_keys();
         self.switches.push(switch);
     }
 
@@ -96,26 +118,27 @@ impl Config {
         match dialoguer::Confirm::new()
             .with_prompt(format!(
                 "Are you sure you want to delete {}?",
-                switch_names[switch_name]
+                switch_names[switch_name].clone()
             ))
             .interact()
         {
             Ok(_) => {
-                self.switches.remove(switch_name);
+                let removed_switch = self.switches.remove(switch_name);
+                removed_switch.remove_keys();
             }
             Err(_) => return,
         }
     }
 
-    pub fn disable_switch(&self) {
+    pub async fn disable_switch(&mut self) {
         if let Some(switch_index) = self.select_switch("Switch to disable".to_string()) {
-            let _ = self.switches[switch_index].disable();
+            let _ = self.switches[switch_index].disable().await;
         }
     }
 
-    pub fn enable_switch(&self) {
+    pub async fn enable_switch(&mut self) {
         if let Some(switch_index) = self.select_switch("Switch to enable".to_string()) {
-            let _ = self.switches[switch_index].enable();
+            let _ = self.switches[switch_index].enable().await;
         }
     }
 
@@ -131,15 +154,16 @@ impl Config {
         switch_names
     }
 
-    pub fn get_switch_status(&self) {
+    pub async fn get_switch_status(&mut self) {
         if let Some(switch_index) = self.select_switch("Switch to get status".to_string()) {
-            let _ = self.switches[switch_index].status();
+            self.switches[switch_index].status().await;
         }
     }
 
     pub fn update_switch(&mut self) {
         if let Some(switch_index) = self.select_switch("Switch to update".to_string()) {
             self.switches[switch_index].update();
+            self.switches[switch_index].set_keys();
         }
     }
 
@@ -173,9 +197,9 @@ impl Config {
         Some(switch_index)
     }
 
-    ////////////////////////
-    /// Wol functions
-    ////////////////////////
+    //
+    // Wol functions
+    //
     pub fn add_wol(&mut self, wol: Wol) {
         self.wols.push(wol);
     }
@@ -209,9 +233,9 @@ impl Config {
         }
     }
 
-    pub fn enable_wol(&self) {
+    pub async fn enable_wol(&mut self) {
         if let Some(wol_index) = self.select_wol("Wol device to enable".to_string()) {
-            let _ = self.wols[wol_index].enable();
+            let _ = self.wols[wol_index].enable().await;
         }
     }
 

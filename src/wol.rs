@@ -1,7 +1,15 @@
 use crate::device::Device;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::net::{Ipv4Addr, UdpSocket};
+use std::{
+    net::{Ipv4Addr, UdpSocket},
+    num::ParseIntError,
+    sync::LazyLock,
+};
+
+static MAC_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$").unwrap()
+});
 
 #[derive(Serialize, Deserialize)]
 pub struct Wol {
@@ -10,16 +18,18 @@ pub struct Wol {
 }
 
 impl Device for Wol {
-    fn disable(&self) -> std::io::Result<()> {
-        Err(std::io::Error::new(std::io::ErrorKind::Other, "Disable not implemented for Wol"))
+    async fn disable(&mut self) -> std::io::Result<()> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Disable not implemented for Wol",
+        ))
     }
 
     fn update(&mut self) {
-        let re = Regex::new(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$").unwrap();
         let mac = dialoguer::Input::<String>::new()
             .with_prompt("MAC")
             .validate_with(|input: &String| -> Result<(), &str> {
-                if !re.is_match(input) {
+                if !MAC_RE.is_match(input) {
                     Err("Invalid MAC address")
                 } else {
                     Ok(())
@@ -32,17 +42,28 @@ impl Device for Wol {
         self.mac = mac;
     }
 
-    fn enable(&self) -> std::io::Result<()> {
+    async fn enable(&mut self) -> std::io::Result<()> {
         // Create magic packet
         // 6 bytes of 0xff followed by 16 repetitions of the target MAC address
         let mut magic_packet = vec![0xff; 6];
-        let mac = self.get_octets().repeat(16);
+        let mac = match self.get_octets() {
+            Ok(m) => m.repeat(16),
+            Err(e) => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    format!("Invalid MAC address: {}", e),
+                ))
+            }
+        };
 
         // build magic packet
         magic_packet.extend(mac);
 
         if magic_packet.len() != 102 {
-            panic!("Magic packet is not 102 bytes");
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Magic packet is not 102 bytes",
+            ));
         }
 
         // Send magic packet to broadcast address on port 9
@@ -56,15 +77,13 @@ impl Device for Wol {
         Ok(())
     }
 
-    fn status(&self) -> std::io::Result<()> {
-        Err(std::io::Error::new(std::io::ErrorKind::Other, "status not implemented"))
+    async fn status(&mut self) {
+        println!("Not implemented");
     }
 }
 
 impl Wol {
     pub fn create(wol_names: Vec<String>) -> Self {
-        let re = Regex::new(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$").unwrap();
-
         let name = dialoguer::Input::<String>::new()
             .with_prompt("Name")
             .validate_with(|input: &String| -> Result<(), &str> {
@@ -80,8 +99,8 @@ impl Wol {
         let mac = dialoguer::Input::<String>::new()
             .with_prompt("MAC")
             .validate_with(|input: &String| -> Result<(), &str> {
-                if !re.is_match(input) {
-                    Err("Invalid MAC address")
+                if !MAC_RE.is_match(input) {
+                    Err("Invalid MAC address. Format should be XX:XX:XX:XX:XX:XX where X is a hexadecimal digit")
                 } else {
                     Ok(())
                 }
@@ -92,13 +111,13 @@ impl Wol {
         Self { name, mac }
     }
 
-    pub fn get_octets(&self) -> Vec<u8> {
+    pub fn get_octets(&self) -> Result<Vec<u8>, ParseIntError> {
         let mut octets = Vec::<u8>::new();
         for octet in self.mac.split(":") {
-            octets.push(u8::from_str_radix(octet, 16).unwrap());
+            octets.push(u8::from_str_radix(octet, 16)?);
         }
 
-        octets
+        Ok(octets)
     }
 }
 
