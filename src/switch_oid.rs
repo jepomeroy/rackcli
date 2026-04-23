@@ -71,3 +71,60 @@ impl SwitchOidBuilder {
             .map(|switch_oid| switch_oid.off)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const STANDARD_OID: &str = "1.3.6.1.2.1.105.1.1.1.3.1";
+
+    #[test]
+    fn test_get_oid_names_count() {
+        assert_eq!(SwitchOidBuilder::new().get_oid_names().len(), 7);
+    }
+
+    #[test]
+    fn test_get_oid_names_contains_all_brands() {
+        let names = SwitchOidBuilder::new().get_oid_names();
+        for brand in &["Aruba", "Cisco", "Dell", "Juniper", "Netgear", "TP-Link", "Ubiquiti"] {
+            assert!(names.contains(&brand.to_string()), "missing brand: {}", brand);
+        }
+    }
+
+    #[test]
+    fn test_get_switch_oid_known_brand() {
+
+        let builder = SwitchOidBuilder::new();
+        let oid = builder.get_switch_oid("Netgear");
+        assert_eq!(oid, Some(&STANDARD_OID.to_string()));
+    }
+
+    #[test]
+    fn test_get_switch_oid_unknown_brand() {
+        assert_eq!(SwitchOidBuilder::new().get_switch_oid("Unknown"), None);
+    }
+
+    #[test]
+    fn test_get_on_returns_one() {
+        for brand in &["Aruba", "Cisco", "Dell", "Juniper", "Netgear", "TP-Link", "Ubiquiti"] {
+            assert_eq!(SwitchOidBuilder::new().get_on(brand), Some(1), "brand: {}", brand);
+        }
+    }
+
+    #[test]
+    fn test_get_off_returns_two() {
+        for brand in &["Aruba", "Cisco", "Dell", "Juniper", "Netgear", "TP-Link", "Ubiquiti"] {
+            assert_eq!(SwitchOidBuilder::new().get_off(brand), Some(2), "brand: {}", brand);
+        }
+    }
+
+    #[test]
+    fn test_get_on_unknown_brand() {
+        assert_eq!(SwitchOidBuilder::new().get_on("Unknown"), None);
+    }
+
+    #[test]
+    fn test_get_oid_name_by_index() {
+        assert_eq!(SwitchOidBuilder::new().get_oid_name(0), "Aruba");
+    }
+}

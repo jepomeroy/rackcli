@@ -126,3 +126,42 @@ impl std::fmt::Display for Wol {
         write!(f, "  Name: {}\n  MAC: {}\n", self.name, self.mac)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn wol(mac: &str) -> Wol {
+        Wol { name: "test".to_string(), mac: mac.to_string() }
+    }
+
+    #[test]
+    fn test_get_octets_valid() {
+        assert_eq!(wol("AA:BB:CC:DD:EE:FF").get_octets().unwrap(), vec![0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
+    }
+
+    #[test]
+    fn test_get_octets_lowercase() {
+        assert_eq!(wol("aa:bb:cc:dd:ee:ff").get_octets().unwrap(), vec![0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
+    }
+
+    #[test]
+    fn test_get_octets_zeros() {
+        assert_eq!(wol("00:00:00:00:00:00").get_octets().unwrap(), vec![0, 0, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn test_get_octets_broadcast() {
+        assert_eq!(wol("FF:FF:FF:FF:FF:FF").get_octets().unwrap(), vec![0xFF; 6]);
+    }
+
+    #[test]
+    fn test_get_octets_invalid_hex() {
+        assert!(wol("ZZ:BB:CC:DD:EE:FF").get_octets().is_err());
+    }
+
+    #[test]
+    fn test_get_octets_length() {
+        assert_eq!(wol("01:23:45:67:89:AB").get_octets().unwrap().len(), 6);
+    }
+}

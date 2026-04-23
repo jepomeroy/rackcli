@@ -373,7 +373,7 @@ impl Switch {
     // Authentication and encryption getters
     //
     pub(crate) fn get_username(&self) -> &[u8] {
-        &self.auth_user.as_bytes()
+        self.auth_user.as_bytes()
     }
 
     pub(crate) fn get_auth_protocol(&self) -> SNMPAuth {
@@ -768,5 +768,59 @@ mod tests {
     fn test_parse_ports_invalid_port() {
         let ports = Switch::parse_ports("1-6,a".to_string());
         assert_eq!(ports, Err("Invalid port range: 1-6,a".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::*;
+
+    // parse_ports edge cases
+    #[test]
+    fn test_parse_ports_empty_string() {
+        assert!(Switch::parse_ports("".to_string()).is_err());
+    }
+
+    #[test]
+    fn test_parse_ports_single_element_range() {
+        assert_eq!(Switch::parse_ports("5-5".to_string()), Ok(vec![5]));
+    }
+
+    #[test]
+    fn test_parse_ports_reversed_range_is_empty() {
+        // 6..=1 in Rust is an empty range — documents current behaviour
+        assert_eq!(Switch::parse_ports("6-1".to_string()), Ok(vec![]));
+    }
+
+    // SNMPVersion Display
+    #[test]
+    fn test_snmp_version_v2_display() {
+        assert_eq!(SNMPVersion::V2.to_string(), "v2");
+    }
+
+    #[test]
+    fn test_snmp_version_v3_display() {
+        assert_eq!(SNMPVersion::V3.to_string(), "v3");
+    }
+
+    // SNMPAuth Display
+    #[test]
+    fn test_snmp_auth_display() {
+        assert_eq!(SNMPAuth::Md5.to_string(), "Md5");
+        assert_eq!(SNMPAuth::Sha1.to_string(), "SHA1");
+        assert_eq!(SNMPAuth::Sha224.to_string(), "SHA224");
+        assert_eq!(SNMPAuth::Sha256.to_string(), "SHA256");
+        assert_eq!(SNMPAuth::Sha384.to_string(), "SHA384");
+        assert_eq!(SNMPAuth::Sha512.to_string(), "SHA512");
+    }
+
+    // SNMPEncryption Display
+    #[test]
+    fn test_snmp_encryption_display() {
+        assert_eq!(SNMPEncryption::None.to_string(), "None");
+        assert_eq!(SNMPEncryption::Des.to_string(), "DES");
+        assert_eq!(SNMPEncryption::Aes128.to_string(), "AES128");
+        assert_eq!(SNMPEncryption::Aes192.to_string(), "AES192");
+        assert_eq!(SNMPEncryption::Aes256.to_string(), "AES256");
     }
 }
