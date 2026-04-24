@@ -89,10 +89,10 @@ Commands:
 
 The configuration file is stored at:
 
-| Platform | Path |
-|---|---|
-| Linux | `~/.config/com.epomeroy.rackcli/config.toml` |
-| macOS | `~/Library/Application Support/com.epomeroy.rackcli/config.toml` |
+| Platform | Path                                                              |
+| -------- | ----------------------------------------------------------------- |
+| Linux    | `~/.config/rackcli/config.toml`                                   |
+| macOS    | `~/Library/Application Support/com.jepomeroy.rackcli/config.toml` |
 
 The file is created automatically on first run. It is written with `0600` permissions (owner read/write only).
 
