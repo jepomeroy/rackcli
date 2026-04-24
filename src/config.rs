@@ -51,7 +51,7 @@ impl Config {
     }
 
     fn get_config_path() -> Result<PathBuf, String> {
-        let base_dirs = ProjectDirs::from("com", "epomeroy", "rackcli")
+        let base_dirs = ProjectDirs::from("com", "jepomeroy", "rackcli")
             .ok_or_else(|| "Could not determine config directory (is $HOME set?)".to_string())?;
         fs::create_dir_all(base_dirs.config_dir()).expect("Create directories");
         Ok(base_dirs.config_dir().join("config.toml"))
