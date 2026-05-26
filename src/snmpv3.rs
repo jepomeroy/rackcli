@@ -1,3 +1,5 @@
+//! SNMPv3 client with support for `authNoPriv` and `authPriv` security levels.
+
 use crate::switch::{SNMPAuth, SNMPEncryption};
 use crate::utils::get_status;
 use crate::{errors::SnmpError, snmp::SnmpClient, switch::SwitchResult};
@@ -5,11 +7,20 @@ use snmp2::v3::{Auth::AuthPriv, AuthProtocol, Cipher, Security};
 use snmp2::{Oid, SyncSession, Value};
 use std::{net::SocketAddr, time::Duration};
 
+/// An authenticated SNMPv3 session to a single switch.
 pub struct SnmpV3Client {
     session: SyncSession,
 }
 
 impl SnmpV3Client {
+    /// Opens an SNMPv3 session to `socket_addr`.
+    ///
+    /// When `encryption` is [`SNMPEncryption::None`] the session uses `authNoPriv` (authentication
+    /// only). Any other variant selects `authPriv` with the corresponding cipher and
+    /// `encryption_key`.
+    ///
+    /// Engine-ID discovery (`session.init()`) runs during construction; errors here typically
+    /// indicate the device is unreachable or the credentials are wrong.
     pub fn new(
         socket_addr: SocketAddr,
         username: &[u8],

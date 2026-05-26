@@ -1,3 +1,5 @@
+//! PoE switch management via SNMPv2c or SNMPv3.
+
 use crate::{device::Device, keyring};
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
@@ -7,6 +9,8 @@ use crate::switch_oid::SwitchOidBuilder;
 
 use std::net::{IpAddr, SocketAddr};
 
+/// A managed PoE switch. Credentials marked `#[serde(skip)]` are loaded from the system keyring
+/// at startup and never written to the config file.
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct Switch {
     pub name: String,
@@ -26,12 +30,14 @@ pub struct Switch {
     encryption_pass: String,
 }
 
+/// The PoE status of a single switch port after a get or set operation.
 #[derive(Clone)]
 pub struct SwitchResult {
     pub port: u64,
     pub status: String,
 }
 
+/// SNMP protocol version used to communicate with a switch.
 #[derive(Serialize, Deserialize, PartialEq, Clone, Copy, Default)]
 pub enum SNMPVersion {
     V2,
@@ -39,6 +45,7 @@ pub enum SNMPVersion {
     V3,
 }
 
+/// SNMPv3 authentication (HMAC) protocol.
 #[derive(Serialize, Deserialize, PartialEq, Clone, Copy, Debug, Default)]
 pub enum SNMPAuth {
     #[default]
@@ -50,6 +57,7 @@ pub enum SNMPAuth {
     Sha512,
 }
 
+/// SNMPv3 privacy (encryption) protocol. `None` selects `authNoPriv` mode.
 #[derive(Serialize, Deserialize, PartialEq, Clone, Copy, Debug, Default)]
 pub enum SNMPEncryption {
     #[default]
@@ -295,6 +303,8 @@ impl Device for Switch {
 }
 
 impl Switch {
+    /// Interactively creates a new switch, validating that the name is unique among
+    /// `switch_names` and collecting all required SNMP credentials.
     pub fn create(switch_names: Vec<String>) -> Self {
         let sob = SwitchOidBuilder::new();
 
@@ -372,14 +382,17 @@ impl Switch {
     //
     // Authentication and encryption getters
     //
+    /// Returns the SNMPv3 username as a byte slice.
     pub(crate) fn get_username(&self) -> &[u8] {
         self.auth_user.as_bytes()
     }
 
+    /// Returns the configured SNMPv3 authentication protocol.
     pub(crate) fn get_auth_protocol(&self) -> SNMPAuth {
         self.auth
     }
 
+    /// Returns the cached auth password, or prompts the user if it was not loaded from the keyring.
     pub(crate) fn get_or_prompt_auth_password(&self) -> Vec<u8> {
         if self.auth_pass.is_empty() {
             dialoguer::Password::new()
@@ -392,10 +405,13 @@ impl Switch {
         }
     }
 
+    /// Returns the configured SNMPv3 privacy (encryption) protocol.
     pub(crate) fn get_privacy_protocol(&self) -> SNMPEncryption {
         self.encryption
     }
 
+    /// Returns the cached privacy password, or prompts the user if encryption is configured but
+    /// the password was not loaded from the keyring.
     pub(crate) fn get_or_prompt_privacy_password(&self) -> Vec<u8> {
         if self.encryption != SNMPEncryption::None && self.encryption_pass.is_empty() {
             dialoguer::Password::new()
@@ -408,6 +424,7 @@ impl Switch {
         }
     }
 
+    /// Returns the SNMPv2c community string.
     pub(crate) fn get_community(&self) -> &str {
         &self.community
     }
@@ -415,11 +432,15 @@ impl Switch {
     //
     // Networking, OIDs, and ports
     //
+    /// Returns the SNMP socket address (IP port 161).
     pub(crate) fn get_socket_addr(&self) -> SocketAddr {
         let ip_addr: IpAddr = self.ip.parse().expect("Invalid IP address");
         SocketAddr::new(ip_addr, 161)
     }
 
+    /// Returns the base PoE OID for this switch's brand as a `Vec<u64>`.
+    ///
+    /// The port number is appended by the SNMP dispatcher before each request.
     pub(crate) fn get_oid(&self) -> Vec<u64> {
         let sob = SwitchOidBuilder::new();
         let oid = sob
@@ -430,6 +451,9 @@ impl Switch {
         oid.split('.').map(|x| x.parse::<u64>().unwrap()).collect()
     }
 
+    /// Prompts the user for a port range expression and returns the expanded list of port numbers.
+    ///
+    /// The default value shown is `1-{total_ports}`. See [`Switch::parse_ports`] for the format.
     pub(crate) fn get_ports(&self) -> Vec<u64> {
         let ports_input = dialoguer::Input::<String>::new()
             .with_prompt("List of ports (ex: 1-6,8,10-12)")
@@ -440,6 +464,10 @@ impl Switch {
         Switch::parse_ports(ports_input).expect("Invalid port range")
     }
 
+    /// Parses a port range expression into a sorted, deduplicated list of port numbers.
+    ///
+    /// Accepts comma-separated values and inclusive ranges, e.g. `"1-6,8,10-12"`.
+    /// Spaces anywhere in the string are rejected.
     pub(crate) fn parse_ports(ports_input: String) -> Result<Vec<u64>, String> {
         let mut ports = Vec::new();
 
@@ -523,6 +551,7 @@ impl Switch {
         Ok(())
     }
 
+    /// Returns the SNMP protocol version configured for this switch.
     pub(crate) fn get_version(&self) -> SNMPVersion {
         self.version
     }
@@ -530,6 +559,7 @@ impl Switch {
     //
     // Key ring functions
     //
+    /// Deletes this switch's credentials from the system keyring.
     pub(crate) fn remove_keys(&self) {
         if self.keyring {
             match self.version {
@@ -571,6 +601,7 @@ impl Switch {
         }
     }
 
+    /// Loads this switch's credentials from the system keyring into the in-memory fields.
     pub(crate) fn get_keys(&mut self) {
         if !self.keyring {
             return;
@@ -610,6 +641,7 @@ impl Switch {
         }
     }
 
+    /// Writes the in-memory credentials to the system keyring.
     pub(crate) fn set_keys(&self) {
         if self.keyring {
             match self.version {

@@ -1,3 +1,5 @@
+//! Wake-on-LAN device support.
+
 use crate::device::Device;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -10,6 +12,7 @@ use std::{
 static MAC_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$").unwrap());
 
+/// A Wake-on-LAN target identified by a friendly name and a colon-separated MAC address.
 #[derive(Serialize, Deserialize)]
 pub struct Wol {
     pub name: String,
@@ -17,10 +20,12 @@ pub struct Wol {
 }
 
 impl Device for Wol {
+    /// Not supported for WoL devices; always returns an error.
     async fn disable(&mut self) -> std::io::Result<()> {
         Err(std::io::Error::other("Disable not implemented for Wol"))
     }
 
+    /// Prompts the user to update the stored MAC address, validating the format.
     fn update(&mut self) {
         let mac = dialoguer::Input::<String>::new()
             .with_prompt("MAC")
@@ -38,6 +43,10 @@ impl Device for Wol {
         self.mac = mac;
     }
 
+    /// Broadcasts a standard 102-byte magic packet to `255.255.255.255:9`.
+    ///
+    /// The magic packet is 6 bytes of `0xFF` followed by 16 repetitions of the target MAC address,
+    /// sent over UDP so the receiving host's NIC can wake the machine.
     async fn enable(&mut self) -> std::io::Result<()> {
         // Create magic packet
         // 6 bytes of 0xff followed by 16 repetitions of the target MAC address
@@ -79,6 +88,8 @@ impl Device for Wol {
 }
 
 impl Wol {
+    /// Interactively creates a new [`Wol`] device, validating that the name is unique among
+    /// `wol_names` and that the MAC address matches `XX:XX:XX:XX:XX:XX` format.
     pub fn create(wol_names: Vec<String>) -> Self {
         let name = dialoguer::Input::<String>::new()
             .with_prompt("Name")
@@ -107,6 +118,7 @@ impl Wol {
         Self { name, mac }
     }
 
+    /// Parses the stored MAC address string into a `Vec<u8>` of six byte values.
     pub fn get_octets(&self) -> Result<Vec<u8>, ParseIntError> {
         let mut octets = Vec::<u8>::new();
         for octet in self.mac.split(":") {

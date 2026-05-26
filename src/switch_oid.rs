@@ -1,4 +1,6 @@
-pub struct SwitchOid {
+//! OID definitions and enable/disable values for supported PoE switch brands.
+
+struct SwitchOid {
     name: String,
     poe_oid: String,
     on: i64,
@@ -16,6 +18,10 @@ impl SwitchOid {
     }
 }
 
+/// Provides OID strings and enable/disable values for all supported PoE switch brands.
+///
+/// All current entries use the standard IEEE 802.3af PoE MIB (`pethPsePortAdminEnable`,
+/// OID `1.3.6.1.2.1.105.1.1.1.3.1`) with `1` to enable and `2` to disable a port.
 pub struct SwitchOidBuilder {
     switch_oids: [SwitchOid; 7],
 }
@@ -39,6 +45,7 @@ impl SwitchOidBuilder {
         Self { switch_oids }
     }
 
+    /// Returns the display names of all supported switch brands.
     pub fn get_oid_names(&self) -> Vec<String> {
         self.switch_oids
             .iter()
@@ -46,10 +53,15 @@ impl SwitchOidBuilder {
             .collect()
     }
 
+    /// Returns the display name for the brand at `index`.
+    ///
+    /// # Panics
+    /// Panics if `index` is out of bounds.
     pub fn get_oid_name(&self, index: usize) -> String {
         self.switch_oids[index].name.clone()
     }
 
+    /// Returns the PoE OID string for `name`, or `None` if the brand is not recognised.
     pub fn get_switch_oid(&self, name: &str) -> Option<&String> {
         self.switch_oids
             .iter()
@@ -57,6 +69,7 @@ impl SwitchOidBuilder {
             .map(|switch_oid| &switch_oid.poe_oid)
     }
 
+    /// Returns the SNMP integer value that enables PoE for `name`, or `None` if not recognised.
     pub fn get_on(&self, name: &str) -> Option<i64> {
         self.switch_oids
             .iter()
@@ -64,6 +77,7 @@ impl SwitchOidBuilder {
             .map(|switch_oid| switch_oid.on)
     }
 
+    /// Returns the SNMP integer value that disables PoE for `name`, or `None` if not recognised.
     pub fn get_off(&self, name: &str) -> Option<i64> {
         self.switch_oids
             .iter()

@@ -1,3 +1,5 @@
+//! SNMP dispatcher that fans out concurrent requests across all ports of a switch.
+
 use std::time::Duration;
 
 use crate::errors::SnmpError;
@@ -7,11 +9,15 @@ use crate::switch::{SNMPVersion, Switch, SwitchResult};
 use snmp2::Oid;
 use tokio::task::JoinSet;
 
+/// Abstracts a single-OID SNMP get/set operation over one port.
 pub trait SnmpClient {
+    /// Fetches the value at `oid` for `port`.
     async fn get(self, oid: Oid, port: u64) -> Result<SwitchResult, SnmpError>;
+    /// Writes `value` to `oid` for `port`.
     async fn set(self, oid: Oid, value: i64, port: u64) -> Result<SwitchResult, SnmpError>;
 }
 
+/// Coordinates concurrent SNMP requests across all ports on a switch.
 pub struct Snmp {}
 
 impl Snmp {
@@ -19,6 +25,10 @@ impl Snmp {
         Self {}
     }
 
+    /// Issues a concurrent GET for every configured port on `switch`.
+    ///
+    /// All port requests are spawned onto a [`JoinSet`] and results are collected in completion
+    /// order, so the returned `Vec` is not necessarily sorted by port number.
     pub async fn get(&self, switch: &Switch) -> Result<Vec<SwitchResult>, SnmpError> {
         let mut req_set = JoinSet::new();
 
@@ -80,6 +90,10 @@ impl Snmp {
         }
     }
 
+    /// Issues a concurrent SET of `value` for every configured port on `switch`.
+    ///
+    /// All port requests are spawned onto a [`JoinSet`] and results are collected in completion
+    /// order, so the returned `Vec` is not necessarily sorted by port number.
     pub async fn set(&self, switch: &Switch, value: i64) -> Result<Vec<SwitchResult>, SnmpError> {
         let mut req_set = JoinSet::new();
 
@@ -141,6 +155,7 @@ impl Snmp {
         }
     }
 
+    /// Appends `port` to `oid_vec` and returns a heap-allocated [`Oid`].
     fn make_oid(oid_vec: Vec<u64>, port: u64) -> Oid<'static> {
         let mut new_vec = oid_vec.to_vec();
         new_vec.push(port);

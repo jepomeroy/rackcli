@@ -1,3 +1,7 @@
+//! `rackcli` — CLI for managing PoE switches and Wake-on-LAN devices.
+//!
+//! The OpenSSL legacy provider is loaded at startup to enable DES-based SNMPv3 sessions.
+
 mod config;
 mod device;
 mod errors;
@@ -19,6 +23,8 @@ use switch::Switch;
 use wol::Wol;
 
 // Add commands
+
+/// Interactively creates a new switch and persists it to config.
 fn add_switch() {
     let mut config = read_config();
     let switch = Switch::create(config.get_switch_names());
@@ -26,6 +32,7 @@ fn add_switch() {
     config.write_config();
 }
 
+/// Interactively creates a new WoL device and persists it to config.
 fn add_wol_device() {
     let mut config = read_config();
     let wol = Wol::create(config.get_wol_names());
@@ -34,12 +41,15 @@ fn add_wol_device() {
 }
 
 // Delete commands
+
+/// Interactively selects and removes a switch from config.
 fn delete_switch() {
     let mut config = read_config();
     config.delete_switch();
     config.write_config();
 }
 
+/// Interactively selects and removes a WoL device from config.
 fn delete_wol_device() {
     let mut config = read_config();
     config.delete_wol();
@@ -47,28 +57,35 @@ fn delete_wol_device() {
 }
 
 // List commands
+
+/// Prints all configured switches and WoL devices.
 fn list_config() {
     let config = read_config();
     config.print_config();
 }
 
+/// Prints all configured switches.
 fn list_switches() {
     let config = read_config();
     config.print_switches();
 }
 
+/// Prints all configured WoL devices.
 fn list_wols() {
     let config = read_config();
     config.print_wols();
 }
 
 // Update commands
+
+/// Interactively edits an existing switch and persists the changes.
 fn update_switch() {
     let mut config = read_config();
     config.update_switch();
     config.write_config();
 }
 
+/// Interactively edits an existing WoL device and persists the changes.
 fn update_wol_device() {
     let mut config = read_config();
     config.update_wol();
@@ -76,23 +93,30 @@ fn update_wol_device() {
 }
 
 // Enable commands
+
+/// Interactively selects a switch and enables PoE on its configured ports via SNMP.
 async fn enable_switch() {
     let mut config = read_config();
     config.enable_switch().await;
 }
 
+/// Interactively selects a WoL device and sends a magic packet to wake it.
 async fn enable_wol_device() {
     let mut config = read_config();
     config.enable_wol().await;
 }
 
 // Disable commands
+
+/// Interactively selects a switch and disables PoE on its configured ports via SNMP.
 async fn disable_switch() {
     let mut config = read_config();
     config.disable_switch().await;
 }
 
 // Status commands
+
+/// Interactively selects a switch and prints the PoE status of its configured ports.
 async fn status_switch() {
     let mut config = read_config();
     config.get_switch_status().await;

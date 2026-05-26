@@ -1,13 +1,17 @@
+//! SNMPv2c client backed by a synchronous blocking session.
+
 use crate::utils::get_status;
 use crate::{errors::SnmpError, snmp::SnmpClient, switch::SwitchResult};
 use snmp2::{Oid, SyncSession, Value};
 use std::{net::SocketAddr, time::Duration};
 
+/// An authenticated SNMPv2c session to a single switch.
 pub struct SnmpV2Client {
     session: SyncSession,
 }
 
 impl SnmpV2Client {
+    /// Opens an SNMPv2c session to `socket_addr` authenticated by `community`.
     pub fn new(
         socket_addr: SocketAddr,
         community: &[u8],

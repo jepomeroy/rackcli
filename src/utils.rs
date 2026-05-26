@@ -1,5 +1,11 @@
+//! Shared helper functions.
+
 use snmp2::Value;
 
+/// Decodes an SNMP integer value into a human-readable port status string.
+///
+/// Follows the IEEE 802.3af PoE MIB convention used by [`crate::switch_oid::SwitchOidBuilder`]:
+/// `1` → `"On"`, `2` → `"Off"`, anything else → `"Unknown"`.
 pub fn get_status(status: Value) -> String {
     match status {
         Value::Integer(1) => "On".to_string(),
