@@ -19,13 +19,18 @@ pub struct Config {
 pub fn read_config() -> Config {
     match Config::get_config_path() {
         Ok(config_path) => match fs::read_to_string(config_path) {
-            Ok(toml_content) => {
-                let mut data: Config = toml::from_str(&toml_content).unwrap();
-                data.switches.iter_mut().for_each(|switch| {
-                    switch.get_keys();
-                });
-                data
-            }
+            Ok(toml_content) => match toml::from_str::<Config>(&toml_content) {
+                Ok(mut data) => {
+                    data.switches.iter_mut().for_each(|switch| {
+                        switch.get_keys();
+                    });
+                    data
+                }
+                Err(e) => {
+                    println!("Error parsing config file: {}", e);
+                    Config::new()
+                }
+            },
             Err(_) => {
                 println!("No config file found, creating one");
                 let config = Config::new();
@@ -115,18 +120,16 @@ impl Config {
             .interact()
             .unwrap();
 
-        match dialoguer::Confirm::new()
+        if dialoguer::Confirm::new()
             .with_prompt(format!(
                 "Are you sure you want to delete {}?",
                 switch_names[switch_name].clone()
             ))
             .interact()
+            .unwrap_or(false)
         {
-            Ok(_) => {
-                let removed_switch = self.switches.remove(switch_name);
-                removed_switch.remove_keys();
-            }
-            Err(_) => return,
+            let removed_switch = self.switches.remove(switch_name);
+            removed_switch.remove_keys();
         }
     }
 
@@ -219,17 +222,15 @@ impl Config {
             .interact()
             .unwrap();
 
-        match dialoguer::Confirm::new()
+        if dialoguer::Confirm::new()
             .with_prompt(format!(
                 "Are you sure you want to delete {}?",
                 wol_names[wol_name]
             ))
             .interact()
+            .unwrap_or(false)
         {
-            Ok(_) => {
-                self.wols.remove(wol_name);
-            }
-            Err(_) => return,
+            self.wols.remove(wol_name);
         }
     }
 

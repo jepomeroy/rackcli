@@ -7,9 +7,8 @@ use std::{
     sync::LazyLock,
 };
 
-static MAC_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$").unwrap()
-});
+static MAC_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^([0-9A-Fa-f]{2}[:]){5}([0-9A-Fa-f]{2})$").unwrap());
 
 #[derive(Serialize, Deserialize)]
 pub struct Wol {
@@ -19,10 +18,7 @@ pub struct Wol {
 
 impl Device for Wol {
     async fn disable(&mut self) -> std::io::Result<()> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Disable not implemented for Wol",
-        ))
+        Err(std::io::Error::other("Disable not implemented for Wol"))
     }
 
     fn update(&mut self) {
@@ -132,27 +128,42 @@ mod tests {
     use super::*;
 
     fn wol(mac: &str) -> Wol {
-        Wol { name: "test".to_string(), mac: mac.to_string() }
+        Wol {
+            name: "test".to_string(),
+            mac: mac.to_string(),
+        }
     }
 
     #[test]
     fn test_get_octets_valid() {
-        assert_eq!(wol("AA:BB:CC:DD:EE:FF").get_octets().unwrap(), vec![0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
+        assert_eq!(
+            wol("AA:BB:CC:DD:EE:FF").get_octets().unwrap(),
+            vec![0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
+        );
     }
 
     #[test]
     fn test_get_octets_lowercase() {
-        assert_eq!(wol("aa:bb:cc:dd:ee:ff").get_octets().unwrap(), vec![0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
+        assert_eq!(
+            wol("aa:bb:cc:dd:ee:ff").get_octets().unwrap(),
+            vec![0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]
+        );
     }
 
     #[test]
     fn test_get_octets_zeros() {
-        assert_eq!(wol("00:00:00:00:00:00").get_octets().unwrap(), vec![0, 0, 0, 0, 0, 0]);
+        assert_eq!(
+            wol("00:00:00:00:00:00").get_octets().unwrap(),
+            vec![0, 0, 0, 0, 0, 0]
+        );
     }
 
     #[test]
     fn test_get_octets_broadcast() {
-        assert_eq!(wol("FF:FF:FF:FF:FF:FF").get_octets().unwrap(), vec![0xFF; 6]);
+        assert_eq!(
+            wol("FF:FF:FF:FF:FF:FF").get_octets().unwrap(),
+            vec![0xFF; 6]
+        );
     }
 
     #[test]

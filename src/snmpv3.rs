@@ -33,17 +33,16 @@ impl SnmpV3Client {
             SNMPAuth::Sha512 => AuthProtocol::Sha512,
         };
 
-        let enc = match encryption {
-            SNMPEncryption::Des => Cipher::Des,
-            SNMPEncryption::Aes128 => Cipher::Aes128,
-            SNMPEncryption::Aes192 => Cipher::Aes192,
-            SNMPEncryption::Aes256 => Cipher::Aes256,
-            _ => unreachable!(),
-        };
-
         let security = if encryption == SNMPEncryption::None {
             Security::new(username, password).with_auth_protocol(auth)
         } else {
+            let enc = match encryption {
+                SNMPEncryption::Des => Cipher::Des,
+                SNMPEncryption::Aes128 => Cipher::Aes128,
+                SNMPEncryption::Aes192 => Cipher::Aes192,
+                SNMPEncryption::Aes256 => Cipher::Aes256,
+                SNMPEncryption::None => unreachable!(),
+            };
             Security::new(username, password)
                 .with_auth_protocol(auth)
                 .with_auth(AuthPriv {
