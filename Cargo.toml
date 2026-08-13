@@ -1,6 +1,6 @@
 [package]
 name = "rackcli"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -17,4 +17,12 @@ snmp2 = { version = "0.5.0", features = ["v3"] }
 thiserror = "2.0.18"
 tokio = { version = "1.52.1", features = ["rt-multi-thread", "macros"] }
 toml = "1.1.2"
-keyring = { version = "3.6.3", features = ["apple-native", "linux-native"] }
+# Linux: store credentials in the Secret Service (gnome-keyring) so they survive
+# reboots. Note: keyring 3.6.3's "linux-native-sync-persistent" store is not
+# usable via Entry::new -- its builder returns a plain SsCredential, so the
+# keyutils half is dead weight. Use the secret-service store directly.
+keyring = { version = "3.6.3", features = [
+    "apple-native",
+    "sync-secret-service",
+    "crypto-openssl",
+] }
