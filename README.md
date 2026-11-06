@@ -20,7 +20,35 @@ All brands use the standard IEEE 802.3af PoE MIB OID (`pethPsePortAdminEnable`).
 
 ## Prerequisites
 
+Rust 1.85 or newer (the crate uses the 2024 edition). Run `rustup update` if your toolchain is older.
+
 OpenSSL with the legacy provider enabled (required for DES encryption). On most systems this is available by default. On Linux you may need to install `libssl-dev` or equivalent.
+
+## Building
+
+### Linux (Debian/Ubuntu)
+
+Install the system libraries needed for OpenSSL and the D-Bus keyring integration:
+
+```bash
+sudo apt install pkg-config libssl-dev libdbus-1-dev
+```
+
+Then build:
+
+```bash
+cargo build --release
+```
+
+The binary is written to `target/release/rackcli`.
+
+### macOS
+
+No extra system packages are required:
+
+```bash
+cargo build --release
+```
 
 ## Installation
 

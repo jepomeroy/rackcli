@@ -2,7 +2,7 @@
 
 use clap::{Args, Parser, Subcommand};
 
-/// Top-level CLI arguments.
+/// A CLI tool for managing PoE switches via SNMP and Wake-on-LAN devices.
 #[derive(Parser, Debug)]
 #[clap(author, about, version)]
 pub struct RackCliArgs {
@@ -13,9 +13,9 @@ pub struct RackCliArgs {
 /// The top-level device category subcommand.
 #[derive(Subcommand, Debug)]
 pub enum DeviceType {
-    /// Add, Delete, List, Update, Enable, Disable, or get Status for Switch devices
+    /// add, delete, list, update, enable, disable, or get status for Switch devices
     Switch(SwitchCmd),
-    /// Add, Delete, List, Update, or Enable Wake-On-Lan devices
+    /// add, delete, list, update, or enable Wake-On-Lan devices
     Wol(WolCmd),
     /// List all devices
     List,
