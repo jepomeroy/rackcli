@@ -6,17 +6,17 @@ edition = "2024"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.6.1", features = ["derive"] }
+clap = { version = "4.6.7", features = ["derive"] }
 colored = "3.1.1"
 dialoguer = "0.12.0"
 openssl = "0.10"
 directories = "6.0.0"
-regex = "1.12.3"
-serde = { version = "1.0.228", features = ["derive"] }
-snmp2 = { version = "0.5.0", features = ["v3"] }
-thiserror = "2.0.18"
-tokio = { version = "1.52.1", features = ["rt-multi-thread", "macros"] }
-toml = "1.1.2"
+regex = "1.13.1"
+serde = { version = "1.0.229", features = ["derive"] }
+snmp2 = { version = "0.5.3", features = ["v3"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros"] }
+toml = "1.2.1"
 # Linux: store credentials in the Secret Service (gnome-keyring) so they survive
 # reboots. Note: keyring 3.6.3's "linux-native-sync-persistent" store is not
 # usable via Entry::new -- its builder returns a plain SsCredential, so the
